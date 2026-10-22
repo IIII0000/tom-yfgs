@@ -3,292 +3,409 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>物流线路价格查询系统</title>
+<title>物流线路价格查询系统 - 企业版</title>
 <style>
-  :root{
-    --primary:#1a6bff; --primary-dark:#0d4fd1; --primary-light:#e8f0fe;
-    --bg:#f2f3f5; --card:#fff; --text:#1f2329; --text-2:#646a73; --text-3:#8f959e;
-    --border:#e5e6eb; --danger:#f54a45; --success:#2ea121; --radius:10px;
+  /* ================= 核心主题变量 ================= */
+  :root {
+    --primary: #1a6bff; --primary-dark: #0d4fd1; --primary-light: #e8f0fe;
+    --bg: #f4f6f8; --card: #ffffff; --text: #1f2329; --text-2: #646a73; --text-3: #8f959e;
+    --border: #e5e6eb; --danger: #f54a45; --success: #2ea121; --radius: 10px;
+    --shadow: 0 4px 16px rgba(0,0,0,0.04);
+    --notice-bg: #fff7e6; --notice-text: #a86a00; --notice-border: #ffe0a3;
+    --sidebar-bg: #1e2229; --sidebar-text: #a0a6b1; --sidebar-active: #1a6bff;
   }
+  [data-theme="dark"] {
+    --primary: #4c8dff; --primary-dark: #3b7df0; --primary-light: #1e2f50;
+    --bg: #121418; --card: #1e2126; --text: #e3e5e8; --text-2: #9ba1a8; --text-3: #6b7280;
+    --border: #33373d; --danger: #ff5b56; --success: #3ddc84;
+    --shadow: 0 4px 16px rgba(0,0,0,0.3);
+    --notice-bg: #2a2113; --notice-text: #e6a23c; --notice-border: #4b3a1c;
+    --sidebar-bg: #181a1f; --sidebar-text: #6b7280;
+  }
+
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
-    background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased}
-  button{font-family:inherit;cursor:pointer}
-  input,select,textarea{font-family:inherit;font-size:14px}
+    background:var(--bg); color:var(--text); font-size:14px; -webkit-font-smoothing:antialiased;}
+  button{font-family:inherit;cursor:pointer;transition:.15s}
+  input,select,textarea{font-family:inherit;font-size:14px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 12px;width:100%;outline:none}
+  input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 
-  .topbar{position:sticky;top:0;z-index:50;height:54px;background:#fff;border-bottom:1px solid var(--border);
-    display:flex;align-items:center;justify-content:space-between;padding:0 16px}
-  .brand{font-size:16px;font-weight:600}
-  .tabs{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:8px}
-  .tab{border:none;background:transparent;padding:6px 14px;border-radius:6px;font-size:13px;color:var(--text-2);font-weight:500}
-  .tab.active{background:#fff;color:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  /* ================= 顶部导航 ================= */
+  .topbar{position:sticky; top:0; z-index:50; height:60px; background:var(--card); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 24px;}
+  .brand{font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px; color: var(--primary);}
+  .brand-icon{width:28px; height:28px; background:var(--primary); border-radius:6px; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px;}
+  .top-actions { display: flex; align-items: center; gap: 16px; }
+  .theme-btn { background: transparent; border: none; font-size: 20px; cursor: pointer; color: var(--text-2); }
+  .tabs{display:flex; gap:4px; background:var(--bg); padding:4px; border-radius:8px;}
+  .tab{border:none; background:transparent; padding:6px 16px; border-radius:6px; font-size:14px; color:var(--text-2); font-weight:500;}
+  .tab.active{background:var(--card); color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.06);}
 
-  .view{display:none;padding-bottom:40px}
+  /* ================= 全局布局 ================= */
+  .view{display:none; padding-bottom:40px}
   .view.active{display:block}
+  .wrap{max-width:1280px; margin:0 auto; padding:24px;}
 
-  .wrap{max-width:760px;margin:0 auto;padding:14px}
-  .panel{background:#fff;border-radius:var(--radius);padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px}
-  .panel h3{font-size:15px;font-weight:600;margin-bottom:12px}
+  /* ================= 前台样式 ================= */
+  .notice-bar { background: var(--notice-bg); border: 1px solid var(--notice-border); color: var(--notice-text); border-radius: var(--radius); padding: 12px 20px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 12px; font-size: 14px; }
+  .notice-bar.hide { display: none; }
+  .layout-grid { display: grid; grid-template-columns: 420px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } }
+  
+  .panel{background:var(--card); border-radius:var(--radius); padding:24px; box-shadow:var(--shadow); border: 1px solid var(--border); margin-bottom: 24px;}
+  .panel h3{font-size:16px; font-weight:600; margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;}
+  
+  .field{margin-bottom:16px}
+  .field label{display:block; font-size:13px; color:var(--text-2); margin-bottom:8px; font-weight:500;}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .grid-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px}
 
-  .field{margin-bottom:12px}
-  .field:last-child{margin-bottom:0}
-  .field label{display:block;font-size:12px;color:var(--text-3);margin-bottom:6px}
-  .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--border);
-    border-radius:8px;background:#fff;outline:none;color:var(--text)}
-  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary)}
-  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;
-    border-radius:8px;border:none;font-size:14px;font-weight:500;background:var(--primary);color:#fff;transition:.15s}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:10px 20px; border-radius:6px; border:none; font-size:14px; font-weight:500; background:var(--primary); color:#fff;}
   .btn:hover{background:var(--primary-dark)}
-  .btn:active{transform:scale(.98)}
-  .btn.block{width:100%}
-  .btn.ghost{background:#fff;color:var(--text-2);border:1px solid var(--border)}
-  .btn.ghost:hover{background:var(--bg)}
+  .btn.block{width:100%; padding:14px; font-size:16px;}
+  .btn.ghost{background:transparent; color:var(--text-2); border:1px solid var(--border)}
+  .btn.ghost:hover{background:var(--bg); color:var(--primary); border-color:var(--primary)}
   .btn.danger{background:var(--danger)}
-  .btn.danger:hover{background:#d93a35}
-  .btn.small{padding:6px 12px;font-size:13px}
-  .btn-row{display:flex;gap:8px;flex-wrap:wrap}
+  .btn.small{padding:6px 12px; font-size:13px;}
 
-  /* 估价器专属样式 - 恢复蓝色系 */
-  .method-switch { display: flex; gap: 10px; margin-bottom: 16px; }
-  .method-btn { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text-2); font-size: 14px; text-align: center; font-weight: 500; transition: 0.2s; }
+  .method-switch { display: flex; gap: 12px; margin-bottom: 20px; }
+  .method-btn { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text-2); font-weight: 600; text-align: center; }
   .method-btn.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
   
-  .shoe-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .shoe-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
   .shoe-row input:nth-child(1) { flex: 3; }
   .shoe-row input:nth-child(2) { flex: 1; text-align: center; }
   .shoe-row input:nth-child(3) { flex: 1; text-align: center; }
-  .shoe-row .remove-shoe { width: 36px; height: 36px; border-radius: 6px; border: none; background: var(--bg); color: var(--text-3); font-size: 18px; flex-shrink: 0; }
+  .shoe-row .remove-shoe { width: 40px; height: 38px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text-3); font-size: 18px; flex-shrink: 0; }
+  .add-shoe-btn { width: 100%; padding: 10px; border: 1px dashed var(--border); background: transparent; border-radius: 6px; color: var(--text-2); margin-bottom: 16px; }
   
-  .add-shoe-btn { width: 100%; padding: 10px; border: 1px dashed var(--border); background: #fff; border-radius: 8px; color: var(--text-2); font-size: 14px; margin-bottom: 12px; }
-  
-  .quick-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-  .quick-tag { padding: 6px 12px; border: 1px solid var(--border); border-radius: 20px; background: #fff; font-size: 12px; color: var(--text-2); }
-  
-  .dimension-group { display: flex; align-items: center; gap: 8px; }
-  .dimension-group input { text-align: center; }
-  .dimension-group span { color: var(--text-3); font-size: 14px; }
+  .route-card{background:var(--card); border-radius:var(--radius); padding:20px; margin-bottom:16px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: 0.2s;}
+  .route-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+  .card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:16px}
+  .carrier-name{font-size:18px; font-weight:600; color: var(--text);}
+  .tag{display:inline-block; font-size:12px; padding:2px 8px; border-radius:4px; background:var(--primary-light); color:var(--primary); margin-left:8px; font-weight:500;}
+  .price{text-align:right;}
+  .price .amount{font-size:26px; font-weight:700; color:var(--danger);}
+  .card-info{display:flex; flex-wrap:wrap; gap:12px; font-size:13px; color:var(--text-2); margin-bottom:16px; background:var(--bg); padding:12px; border-radius:6px;}
+  .card-rule{border-top:1px dashed var(--border); padding-top:12px; font-size:12px; color:var(--text-3); line-height:1.6;}
 
-  /* 结果列表 - 恢复蓝色系 */
-  .route-card{background:#fff;border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.04); border: 1px solid var(--border);}
-  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
-  .carrier-name{font-size:16px;font-weight:600;line-height:1.35; color:var(--text);}
-  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:4px;
-    background:var(--primary-light);color:var(--primary);margin-left:6px;vertical-align:middle;font-weight:400}
-  .price{text-align:right;flex-shrink:0}
-  .price .amount{font-size:22px;font-weight:700;color:var(--danger);line-height:1.1}
-  .price .unit{display:block;font-size:11px;color:var(--text-3);margin-top:3px}
-  .card-info{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--text-2);margin-bottom:10px}
-  .card-rule{border-top:1px dashed var(--border);padding-top:10px;font-size:12px;color:var(--text-3);line-height:1.7}
-  .card-rule strong{color:var(--text-2);font-weight:500}
+  .footer { margin-top: 40px; padding: 30px 0; border-top: 1px solid var(--border); color: var(--text-2); }
+  .footer-content { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; }
+  .contact-item { display: flex; align-items: center; gap: 8px; font-size: 15px; }
 
-  .table-wrap{overflow-x:auto;background:#fff;border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.04)}
-  table{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
-  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
-  th{background:#fafbfc;color:var(--text-3);font-weight:500;font-size:12px;white-space:nowrap}
-  tr:last-child td{border-bottom:none}
-  td .name{font-weight:500}
-  td .sub{font-size:12px;color:var(--text-3);margin-top:2px}
-  .op-btns{display:flex;gap:6px}
-  .link-btn{border:none;background:none;color:var(--primary);font-size:13px;padding:2px 4px}
+  /* ================= 后台布局 (左右分栏) ================= */
+  .admin-layout { display: flex; min-height: calc(100vh - 60px); }
+  
+  /* 左侧菜单 */
+  .sidebar { width: 240px; background: var(--sidebar-bg); flex-shrink: 0; padding-top: 16px; }
+  .menu-item { padding: 14px 24px; color: var(--sidebar-text); font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; }
+  .menu-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
+  .menu-item.active { color: #fff; background: var(--sidebar-active); font-weight: 500; border-left: 4px solid var(--primary-dark); padding-left: 20px; }
+  
+  /* 右侧内容 */
+  .admin-content { flex: 1; padding: 24px; overflow-y: auto; }
+  .admin-panel { display: none; background: var(--card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); border: 1px solid var(--border); min-height: 500px;}
+  .admin-panel.active { display: block; }
+  .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .admin-header h2 { font-size: 18px; font-weight: 600; }
+
+  /* 搜索工具栏 */
+  .toolbar { display: flex; gap: 12px; margin-bottom: 16px; background: var(--bg); padding: 12px; border-radius: 8px; align-items: center;}
+  .toolbar input, .toolbar select { width: auto; min-width: 150px; background: var(--card);}
+  .toolbar .spacer { flex: 1; }
+
+  /* 表格 */
+  .table-wrap{overflow-x:auto; width: 100%;}
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  th,td{padding:12px 16px; text-align:left; border-bottom:1px solid var(--border); vertical-align:middle;}
+  th{background:var(--bg); color:var(--text-2); font-weight:600; font-size:13px; white-space:nowrap;}
+  tr:hover td { background: var(--bg); }
+  .op-btns{display:flex; gap:8px;}
+  .link-btn{border:none; background:transparent; color:var(--primary); font-size:13px; font-weight:500; padding:4px;}
   .link-btn.danger{color:var(--danger)}
 
-  .modal-mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;
-    align-items:center;justify-content:center;padding:16px}
-  .modal-mask.show{display:flex}
-  .modal{background:#fff;border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
-  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--border)}
-  .modal-head h3{font-size:16px;font-weight:600}
-  .modal-close{border:none;background:none;font-size:22px;color:var(--text-3);line-height:1;padding:0 4px}
-  .modal-body{padding:16px}
-  .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 16px;border-top:1px solid var(--border)}
-  .checkbox-group{display:flex;flex-wrap:wrap;gap:8px 14px;padding-top:2px}
-  .checkbox-group label{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text-2);margin:0}
-  .checkbox-group input{width:auto;padding:0}
-
-  .hint{font-size:12px;color:var(--text-3);line-height:1.7;margin-top:8px}
-  .warn-box{background:#fff7e6;border:1px solid #ffe0a3;color:#a86a00;border-radius:8px;
-    padding:10px 12px;font-size:12px;line-height:1.7;margin-bottom:12px}
-  .error-msg{color:var(--danger);font-size:12px;margin-bottom:10px;min-height:16px;}
+  /* 复杂弹窗表单样式 */
+  .modal-mask{display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center; padding:20px;}
+  .modal-mask.show{display:flex;}
+  .modal{background:var(--card); border-radius:12px; width:100%; max-width:800px; max-height:90vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,0.2); border:1px solid var(--border);}
+  .modal-head{display:flex; justify-content:space-between; align-items:center; padding:16px 24px; border-bottom:1px solid var(--border); position: sticky; top: 0; background: var(--card); z-index: 10;}
+  .modal-head h3{font-size:16px; font-weight:600; display: flex; align-items: center; gap: 8px;}
+  .modal-head h3::before { content: ''; display: block; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; }
+  .modal-close{border:none; background:transparent; font-size:24px; color:var(--text-3); cursor:pointer;}
+  .modal-body{padding:24px;}
+  .modal-foot{display:flex; justify-content:flex-end; gap:12px; padding:16px 24px; border-top:1px solid var(--border); position: sticky; bottom: 0; background: var(--card);}
+  
+  /* 表单分组标题 */
+  .form-group-title { font-size: 14px; font-weight: 600; color: var(--primary); margin: 20px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .form-group-title::before { content: ''; display: block; width: 4px; height: 14px; background: var(--primary); border-radius: 2px; }
+  
+  /* 单选/多选框样式 */
+  .radio-group { display: flex; gap: 16px; align-items: center; }
+  .radio-group label { display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; color: var(--text); margin: 0;}
+  .radio-group input[type="radio"], .radio-group input[type="checkbox"] { width: auto; margin: 0; }
+  
+  .help-text { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+  .upload-box { width: 100px; height: 100px; border: 1px dashed var(--border); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-3); cursor: pointer; background: var(--bg); position: relative; overflow: hidden;}
+  .upload-box img { width: 100%; height: 100%; object-fit: cover; }
 </style>
 </head>
 <body>
 
+<!-- ================= 顶部导航 ================= -->
 <header class="topbar">
-  <div class="brand">物流线路价格查询系统</div>
-  <nav class="tabs">
-    <button class="tab active" data-view="query">前台查询</button>
-    <button class="tab" data-view="admin">后台管理</button>
-  </nav>
+  <div class="brand">
+    <div class="brand-icon">✈</div>
+    跨境物流查价系统
+  </div>
+  <div class="top-actions">
+    <button class="theme-btn" id="themeToggle" title="切换暗黑/明亮模式">🌙</button>
+    <nav class="tabs">
+      <button class="tab active" data-view="query">前台查询</button>
+      <button class="tab" data-view="admin">后台管理</button>
+    </nav>
+  </div>
 </header>
 
 <!-- ================= 前台查询 ================= -->
 <section id="view-query" class="view active">
   <div class="wrap">
-    
-    <div class="panel">
-      <h3>快速估价</h3>
-      
-      <div class="field">
-        <label>估价方式</label>
-        <div class="method-switch">
-          <button class="method-btn active" data-mode="shoe">👟 按鞋子估（新手）</button>
-          <button class="method-btn" data-mode="weight">📐 按重量/尺寸（老手）</button>
-        </div>
-      </div>
+    <div id="noticeContainer" class="notice-bar hide">
+      <div class="notice-icon">📢</div>
+      <div id="noticeContent"></div>
+    </div>
 
-      <div class="field">
-        <label>选择目的地（国家）</label>
-        <select id="estDestSelect"></select>
-      </div>
-
-      <!-- 模式一：按鞋子估 -->
-      <div id="modeShoe">
+    <div class="layout-grid">
+      <!-- 左侧：估价表单 -->
+      <div class="panel">
+        <h3>快速估价</h3>
+        
         <div class="field">
-          <label>填型号 + 尺码 + 双数（多款混装可一起算）</label>
-          <div id="shoeList">
-            <div class="shoe-row">
-              <input type="text" placeholder="型号，例如 Kobe" class="shoe-model">
-              <input type="number" placeholder="尺码" class="shoe-size">
-              <input type="number" placeholder="双数" value="1" class="shoe-qty">
-              <button class="remove-shoe" onclick="this.parentNode.remove()">×</button>
+          <label>1. 选择目的地（国家）</label>
+          <select id="estDestSelect"></select>
+        </div>
+
+        <div class="field">
+          <label>2. 选择估价方式</label>
+          <div class="method-switch">
+            <button class="method-btn active" data-mode="shoe">👟 按鞋子估</button>
+            <button class="method-btn" data-mode="weight">📐 按重量/尺寸估</button>
+          </div>
+        </div>
+
+        <div id="modeShoe">
+          <div class="field">
+            <label>填写鞋子信息（多款混装可一起算）</label>
+            <div id="shoeList">
+              <div class="shoe-row">
+                <input type="text" placeholder="型号 (如 Kobe)" class="shoe-model">
+                <input type="number" placeholder="尺码" class="shoe-size">
+                <input type="number" placeholder="双数" value="1" class="shoe-qty">
+                <button class="remove-shoe" onclick="this.parentNode.remove()">×</button>
+              </div>
+            </div>
+            <button class="add-shoe-btn" id="addShoeBtn">+ 再加一款</button>
+          </div>
+          <div class="field">
+            <label>快捷填选：</label>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <button class="btn ghost small" onclick="fillShoe('AJ1')">AJ1</button>
+              <button class="btn ghost small" onclick="fillShoe('Dunk')">Dunk</button>
+              <button class="btn ghost small" onclick="fillShoe('Yeezy')">Yeezy</button>
+              <button class="btn ghost small" onclick="fillShoe('AF1')">AF1</button>
+              <button class="btn ghost small" onclick="fillShoe('Kobe')">Kobe</button>
             </div>
           </div>
-          <button class="add-shoe-btn" id="addShoeBtn">+ 再加一款</button>
         </div>
-        <div class="field">
-          <label>常见款点一下（填进最近选中的那行）：</label>
-          <div class="quick-tags">
-            <button class="quick-tag" onclick="fillShoe('AJ1 低帮')">AJ1 低帮</button>
-            <button class="quick-tag" onclick="fillShoe('AJ4')">AJ4</button>
-            <button class="quick-tag" onclick="fillShoe('Dunk 熊猫')">Dunk 熊猫</button>
-            <button class="quick-tag" onclick="fillShoe('AJ1 高帮')">AJ1 高帮</button>
-            <button class="quick-tag" onclick="fillShoe('AJ5')">AJ5</button>
-            <button class="quick-tag" onclick="fillShoe('AJ11')">AJ11</button>
-            <button class="quick-tag" onclick="fillShoe('Yeezy')">Yeezy</button>
-            <button class="quick-tag" onclick="fillShoe('AF1')">AF1</button>
-            <button class="quick-tag" onclick="fillShoe('Kobe')">Kobe</button>
+
+        <div id="modeWeight" style="display: none;">
+          <div class="field">
+            <label>实重（KG）</label>
+            <input type="number" id="estActualWeight" placeholder="包裹实际称重，例如 5" step="0.1">
+          </div>
+          <div class="field">
+            <label>包裹尺寸（cm · 选填，用于算材积重）</label>
+            <div class="dimension-group" style="display: flex; gap: 8px; align-items: center;">
+              <input type="number" id="estLength" placeholder="长">
+              <span>×</span>
+              <input type="number" id="estWidth" placeholder="宽">
+              <span>×</span>
+              <input type="number" id="estHeight" placeholder="高">
+            </div>
           </div>
         </div>
+
+        <button class="btn block" id="btnEstimate" style="margin-top: 10px; background:#f5b041;">立即估算运费 →</button>
       </div>
 
-      <!-- 模式二：按重量/尺寸 -->
-      <div id="modeWeight" style="display: none;">
-        <div class="field">
-          <label>实重（KG）</label>
-          <input type="number" id="estActualWeight" placeholder="包裹实际称重，例如 5" step="0.1">
-        </div>
-        <div class="field">
-          <label>包裹尺寸（cm · 选填，用于算材积重 ÷5000）</label>
-          <div class="dimension-group">
-            <input type="number" id="estLength" placeholder="长">
-            <span>×</span>
-            <input type="number" id="estWidth" placeholder="宽">
-            <span>×</span>
-            <input type="number" id="estHeight" placeholder="高">
-          </div>
-        </div>
-      </div>
-
-      <button class="btn block" id="btnEstimate">估算运费 →</button>
-      
-      <!-- 估价结果列表展示区 -->
-      <div id="estimateResultsContainer" style="margin-top: 24px; display: none;">
-        <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--primary);">
-          该国家的所有可用线路及预估价：
+      <!-- 右侧：结果展示区 -->
+      <div class="panel" style="min-height: 400px;">
+        <h3>推荐线路比价</h3>
+        <div id="emptyResultTip" style="text-align: center; padding: 80px 20px; color: var(--text-3);">
+          请在左侧填写目的地和包裹信息<br><br>点击「估算运费」即可查看报价
         </div>
         <div id="estimateResultsList"></div>
       </div>
     </div>
 
+    <!-- 底部联系方式 -->
+    <footer class="footer">
+      <div class="footer-content" id="footerContacts"></div>
+    </footer>
   </div>
 </section>
 
 <!-- ================= 后台管理 ================= -->
 <section id="view-admin" class="view">
-  <div class="wrap">
-    <div class="panel" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px;">
-      <div style="font-size:14px;">当前登录：<strong id="adminCurrentUser">admin</strong></div>
-      <button class="btn ghost small" id="btnLogout" style="color:var(--danger); border-color:var(--danger);">退出登录</button>
+  <div class="admin-layout">
+    <!-- 左侧菜单 -->
+    <div class="sidebar">
+      <div class="menu-item active" data-target="panel-profile">👤 个人中心</div>
+      <div class="menu-item" data-target="panel-lines">🌐 国际线路</div>
+      <div class="menu-item" data-target="panel-configs">⚙️ 线路配置</div>
+      <div class="menu-item" data-target="panel-countries">🗺️ 国家配置</div>
+      <div class="menu-item" data-target="panel-notice">📢 公告管理</div>
+      <div class="menu-item" data-target="panel-contact">📞 联系方式</div>
     </div>
 
-    <div class="panel">
-      <h3>线路管理</h3>
-      <div class="btn-row" style="margin-bottom:8px">
-        <button class="btn" id="btnAdd">+ 新增线路</button>
-        <button class="btn ghost" id="btnExport">导出数据 (.xls)</button>
-        <button class="btn ghost" id="btnImport">导入数据 (.csv)</button>
-        <button class="btn ghost" id="btnReset">恢复默认数据</button>
-        <input type="file" id="fileInput" accept=".csv" style="display:none">
+    <!-- 右侧内容区 -->
+    <div class="admin-content">
+      
+      <!-- 个人中心 -->
+      <div class="admin-panel active" id="panel-profile">
+        <div class="admin-header"><h2>个人中心</h2></div>
+        <div class="grid-2" style="max-width: 600px;">
+          <div class="field">
+            <label>当前管理员账号</label>
+            <input type="text" id="adminCurrentUser" value="admin" readonly style="background:var(--bg);">
+          </div>
+          <div class="field">
+            <label>操作</label>
+            <div style="display:flex; gap:10px;">
+              <button class="btn ghost" id="btnChangePassModal">修改密码</button>
+              <button class="btn danger" id="btnLogout">退出登录</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="hint" style="color:var(--danger); margin-bottom:12px;">
-        注意：导出的 .xls 可直接用 Excel 打开。如需导入，请在 Excel 中点击「文件 → 另存为 → 选择 CSV (逗号分隔)」后再上传。
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>线路名称</th>
-              <th>目的地</th>
-              <th>首重 / 续重</th>
-              <th>时效</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody id="adminTbody"></tbody>
-        </table>
-      </div>
-    </div>
 
-    <div class="panel">
-      <h3>基础设置</h3>
-      <div class="field">
-        <label>目的地列表（用逗号分隔，例如：美国,英国,日本）</label>
-        <input id="cfgDests">
-      </div>
-      <button class="btn" id="btnSaveBase">保存基础设置</button>
-    </div>
+      <!-- 国际线路 -->
+      <div class="admin-panel" id="panel-lines">
+        <div class="admin-header">
+          <h2>国际线路管理</h2>
+          <button class="btn" id="btnAddLine">+ 新增国际线路</button>
+        </div>
+        
+        <!-- 筛选栏 -->
+        <div class="toolbar">
+          <input type="text" id="filterLineName" placeholder="搜索线路名称/物流商">
+          <select id="filterLineStatus">
+            <option value="">全部状态</option>
+            <option value="1">启用</option>
+            <option value="0">未启用</option>
+          </select>
+          <button class="btn ghost" onclick="renderAdminLines()">筛选</button>
+        </div>
 
-    <div class="panel">
-      <h3>修改登录密码</h3>
-      <div class="grid-3">
-        <div class="field">
-          <label>原密码</label>
-          <input type="password" id="oldPass" placeholder="输入旧密码">
-        </div>
-        <div class="field">
-          <label>新密码</label>
-          <input type="password" id="newPass" placeholder="输入新密码">
-        </div>
-        <div class="field">
-          <label>确认新密码</label>
-          <input type="password" id="newPass2" placeholder="再次输入新密码">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>图标</th><th>线路名称</th><th>物流商</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody id="lineTbody"></tbody>
+          </table>
         </div>
       </div>
-      <button class="btn" id="btnChangePass">保存新密码</button>
+
+      <!-- 线路配置 -->
+      <div class="admin-panel" id="panel-configs">
+        <div class="admin-header">
+          <h2>线路配置 (线路与国家的计费规则)</h2>
+          <button class="btn" id="btnAddConfig">+ 新增线路配置</button>
+        </div>
+        
+        <!-- 筛选栏 -->
+        <div class="toolbar">
+          <select id="filterCfgCountry">
+            <option value="">全部国家</option>
+          </select>
+          <select id="filterCfgLine">
+            <option value="">全部线路</option>
+          </select>
+          <select id="filterCfgStatus">
+            <option value="">全部状态</option>
+            <option value="1">启用</option>
+            <option value="0">未启用</option>
+          </select>
+          <button class="btn ghost" onclick="renderAdminConfigs()">筛选</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>线路</th><th>国家</th><th>计费规则</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody id="configTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 国家配置 -->
+      <div class="admin-panel" id="panel-countries">
+        <div class="admin-header">
+          <h2>国家配置</h2>
+        </div>
+        
+        <div class="field" style="margin-bottom: 20px;">
+          <label>批量添加国家（支持用逗号、空格或换行分隔，例如：美国, 英国 日本）</label>
+          <div style="display:flex; gap:10px;">
+            <input type="text" id="batchCountryInput" placeholder="输入国家名称...">
+            <button class="btn" id="btnAddCountry" style="white-space: nowrap;">+ 批量添加</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>国家名称</th><th>操作</th></tr></thead>
+            <tbody id="countryTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 公告管理 -->
+      <div class="admin-panel" id="panel-notice">
+        <div class="admin-header"><h2>公告管理</h2></div>
+        <div class="field">
+          <label>公告内容（留空则前台不显示）</label>
+          <textarea id="cfgNotice" rows="4" placeholder="输入公告内容..."></textarea>
+        </div>
+        <button class="btn" id="btnSaveNotice">保存公告</button>
+      </div>
+
+      <!-- 联系方式 -->
+      <div class="admin-panel" id="panel-contact">
+        <div class="admin-header"><h2>联系方式配置</h2></div>
+        <div class="field">
+          <label>客服电话</label>
+          <input id="cfgPhone" placeholder="例如：400-888-8888">
+        </div>
+        <div class="field">
+          <label>微信客服</label>
+          <input id="cfgWechat" placeholder="例如：kuaixian888">
+        </div>
+        <div class="field">
+          <label>公司地址</label>
+          <input id="cfgAddress" placeholder="例如：广东省深圳市宝安区...">
+        </div>
+        <button class="btn" id="btnSaveContact">保存联系方式</button>
+      </div>
+
     </div>
   </div>
 </section>
 
-<!-- ================= 登录弹窗 ================= -->
+<!-- ================= 弹窗：登录 ================= -->
 <div class="modal-mask" id="loginMask">
-  <div class="modal" style="max-width: 360px;">
-    <div class="modal-head">
-      <h3>后台管理登录</h3>
-      <button class="modal-close" id="loginClose">&times;</button>
-    </div>
+  <div class="modal" style="max-width: 400px;">
+    <div class="modal-head"><h3>后台管理登录</h3><button class="modal-close" id="loginClose">&times;</button></div>
     <div class="modal-body">
-      <div class="field">
-        <label>账号</label>
-        <input id="loginUser" placeholder="请输入账号" type="text">
-      </div>
-      <div class="field">
-        <label>密码</label>
-        <input id="loginPass" placeholder="请输入密码" type="password">
-      </div>
-      <div class="error-msg" id="loginError"></div>
+      <div class="field"><label>账号</label><input id="loginUser" type="text"></div>
+      <div class="field"><label>密码</label><input id="loginPass" type="password"></div>
+      <div style="color:var(--danger); font-size:13px; min-height:18px;" id="loginError"></div>
     </div>
     <div class="modal-foot">
       <button class="btn ghost" id="loginCancel">取消</button>
@@ -297,259 +414,771 @@
   </div>
 </div>
 
-<!-- ================= 编辑线路弹窗 ================= -->
-<div class="modal-mask" id="modalMask">
-  <div class="modal">
-    <div class="modal-head">
-      <h3 id="modalTitle">新增线路</h3>
-      <button class="modal-close" id="modalClose">&times;</button>
-    </div>
+<!-- ================= 弹窗：修改密码 ================= -->
+<div class="modal-mask" id="passMask">
+  <div class="modal" style="max-width: 400px;">
+    <div class="modal-head"><h3>修改密码</h3><button class="modal-close" id="passClose">&times;</button></div>
     <div class="modal-body">
-      <div class="grid-2">
-        <div class="field">
-          <label>线路名称 *</label>
-          <input id="fName" placeholder="例如：THGJ 美国快线小包">
-        </div>
-        <div class="field">
-          <label>标签</label>
-          <input id="fTag" placeholder="例如：VIP、特惠、快线">
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label>线路类型</label>
-          <input id="fType" placeholder="例如：空运专线、海运专线">
-        </div>
-        <div class="field">
-          <label>目的地 *</label>
-          <select id="fDest"></select>
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label>首重（克）*</label>
-          <input id="fFirstWeight" type="number" min="1" value="500">
-        </div>
-        <div class="field">
-          <label>首重价格（元）*</label>
-          <input id="fFirstPrice" type="number" min="0" step="0.01" value="88">
+      <div class="field"><label>原密码</label><input type="password" id="oldPass"></div>
+      <div class="field"><label>新密码</label><input type="password" id="newPass"></div>
+      <div class="field"><label>确认新密码</label><input type="password" id="newPass2"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="passCancel">取消</button>
+      <button class="btn" id="btnChangePass">确认修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 弹窗：国际线路表单 ================= -->
+<div class="modal-mask" id="lineModal">
+  <div class="modal" style="max-width: 700px;">
+    <div class="modal-head"><h3 id="lineModalTitle">新增国际线路</h3><button class="modal-close" onclick="closeModal('lineModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>图标</label>
+        <div class="upload-box" onclick="document.getElementById('lineIconInput').click()">
+          <div id="lineIconPreview">+<br><span style="font-size:12px">上传</span></div>
+          <input type="file" id="lineIconInput" accept="image/*" style="display:none" onchange="previewIcon(this)">
         </div>
       </div>
       <div class="grid-2">
         <div class="field">
-          <label>续重（克）*</label>
-          <input id="fAddWeight" type="number" min="1" value="500">
+          <label>是否启用 *</label>
+          <div class="radio-group">
+            <label><input type="radio" name="lineEnabled" value="0"> 未启用</label>
+            <label><input type="radio" name="lineEnabled" value="1" checked> 启用中</label>
+          </div>
         </div>
         <div class="field">
-          <label>续重价格（元）*</label>
-          <input id="fAddPrice" type="number" min="0" step="0.01" value="35">
+          <label>官网地址 *</label>
+          <input id="lineWebsite" placeholder="请输入网址">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>寄件人信息 *</label>
+          <select id="lineSender">
+            <option value="">请选择</option>
+            <option value="深圳">深圳仓</option>
+            <option value="义乌">义乌仓</option>
+            <option value="广州">广州仓</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>物流商 *</label>
+          <select id="lineCarrier">
+            <option value="">请选择</option>
+            <option value="EMS">EMS</option>
+            <option value="FedEx">FedEx</option>
+            <option value="UPS">UPS</option>
+            <option value="DHL">DHL</option>
+            <option value="云途">云途</option>
+            <option value="燕文">燕文</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>不能使用的服务 *</label>
+        <div class="radio-group" style="padding: 8px 0;">
+          <!-- 仅保留极简包装 -->
+          <label><input type="checkbox" id="lineForbiddenService" value="极简包装"> 极简包装</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>线路名称 *</label>
+        <input id="lineName" placeholder="例如：US-FedEx 特快">
+      </div>
+      <div class="field">
+        <label>线路特点</label>
+        <textarea id="lineFeatures" rows="3" placeholder="请输入线路特点，最多200字"></textarea>
+      </div>
+      <div class="field">
+        <label>禁寄物品</label>
+        <textarea id="lineProhibited" rows="3" placeholder="请输入禁寄物品说明，最多200字"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeModal('lineModal')">取消</button>
+      <button class="btn" id="btnSaveLine">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 弹窗：线路配置表单 ================= -->
+<div class="modal-mask" id="configModal">
+  <div class="modal" style="max-width: 800px;">
+    <div class="modal-head"><h3 id="configModalTitle">修改线路配置</h3><button class="modal-close" onclick="closeModal('configModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-group-title">基本信息</div>
+      <div class="grid-3">
+        <div class="field">
+          <label>是否启用 *</label>
+          <div class="radio-group">
+            <label><input type="radio" name="cfgEnabled" value="0"> 未启用</label>
+            <label><input type="radio" name="cfgEnabled" value="1" checked> 启用中</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>线路 *</label>
+          <select id="cfgLineId"></select>
+        </div>
+        <div class="field">
+          <label>国家 *</label>
+          <select id="cfgCountryId"></select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>寄送周期</label>
+          <input id="cfgDeliveryCycle" placeholder="例如：7-12天">
+        </div>
+      </div>
+
+      <div class="form-group-title">规则信息</div>
+      <div class="grid-3">
+        <div class="field">
+          <label>最低限制 (g) *</label>
+          <input type="number" id="cfgMinWeight" value="1">
+        </div>
+        <div class="field">
+          <label>最高限制 (g) *</label>
+          <input type="number" id="cfgMaxWeight" value="30000">
+        </div>
+        <div class="field">
+          <label>体积重基数 *</label>
+          <input type="number" id="cfgVolDivisor" value="6000">
         </div>
       </div>
       <div class="grid-3">
         <div class="field">
-          <label>燃油费率（%）</label>
-          <input id="fFuel" type="number" min="0" step="0.1" value="0">
+          <label>计抛规则</label>
+          <select id="cfgVolRule">
+            <option value="0">实际重量</option>
+            <option value="1">按材积重和实际重量取最大值</option>
+          </select>
         </div>
         <div class="field">
-          <label>时效最短（天）</label>
-          <input id="fEtaMin" type="number" min="1" value="7">
+          <label>计费类型 *</label>
+          <div class="radio-group">
+            <label><input type="radio" name="cfgPriceType" value="first_add" checked> 首重续重</label>
+            <label><input type="radio" name="cfgPriceType" value="special"> 特殊重量</label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid-2">
+        <div class="field">
+          <label>首重重量 (g) *</label>
+          <input type="number" id="cfgFirstWeight" value="500">
         </div>
         <div class="field">
-          <label>时效最长（天）</label>
-          <input id="fEtaMax" type="number" min="1" value="12">
+          <label>首重运费 (¥) *</label>
+          <input type="number" id="cfgFirstPrice" value="80">
         </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>续重重量 (g) *</label>
+          <input type="number" id="cfgAddWeight" value="500">
+        </div>
+        <div class="field">
+          <label>续重运费 (¥) *</label>
+          <input type="number" id="cfgAddPrice" value="30">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label>服务费 (%) *</label>
+          <input type="number" id="cfgServiceFee" value="0">
+        </div>
+        <div class="field">
+          <label>报关费 (¥) *</label>
+          <input type="number" id="cfgCustomsFee" value="0">
+        </div>
+        <div class="field">
+          <label>燃油费 (%) *</label>
+          <input type="number" id="cfgFuelRate" value="0">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label>操作费 (¥) *</label>
+          <input type="number" id="cfgOperationFee" value="0">
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="field">
+          <label>最长边 (cm) *</label>
+          <input type="number" id="cfgMaxLength" value="100">
+        </div>
+        <div class="field">
+          <label>第二长边 (cm) *</label>
+          <input type="number" id="cfgSecondLength" value="80">
+        </div>
+        <div class="field">
+          <label>最短边之和+2*最长边 (cm) *</label>
+          <input type="number" id="cfgMinGirth" value="200">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>长宽高之和 (cm) *</label>
+          <input type="number" id="cfgMaxGirth" value="300">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label>申报类型 *</label>
+          <div class="radio-group">
+            <label><input type="radio" name="cfgDeclareType" value="required"> 必填</label>
+            <label><input type="radio" name="cfgDeclareType" value="forbidden" checked> 禁填</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>申报币种 *</label>
+          <select id="cfgCurrency">
+            <option value="">请选择</option>
+            <option value="USD">USD (美元)</option>
+            <option value="EUR">EUR (欧元)</option>
+            <option value="GBP">GBP (英镑)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>线路特点</label>
+        <textarea id="cfgFeatures" rows="2" placeholder="未填则默认使用主线路的特点"></textarea>
+      </div>
+      <div class="field">
+        <label>禁寄物品</label>
+        <textarea id="cfgProhibited" rows="2" placeholder="未填则默认使用主线路的内容"></textarea>
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn ghost" id="modalCancel">取消</button>
-      <button class="btn" id="modalSave">保存</button>
+      <button class="btn ghost" onclick="closeModal('configModal')">取消</button>
+      <button class="btn" id="btnSaveConfig">确定</button>
     </div>
   </div>
 </div>
 
 <script>
 /* =========================================================
-   数据与账号配置
+   1. 数据模型与初始化
    ========================================================= */
-const STORAGE_KEY = 'logistics_data_v1';
+const STORAGE_KEY = 'logistics_data_v4'; // 升级版本号，防旧数据冲突
 const AUTH_KEY = 'logistics_auth_v1';
 
 function getAuth() {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  const defaultAuth = { username: 'admin', password: '123456' };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(defaultAuth));
-  return defaultAuth;
+  let raw = localStorage.getItem(AUTH_KEY);
+  if (raw) return JSON.parse(raw);
+  let def = { username: 'admin', password: '123456' };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(def));
+  return def;
 }
 let AUTH = getAuth();
 
-const RAW_DEFAULT = [
-  ['THGJ 美国快线小包','VIP','空运专线','美国',500,88,500,35,12,7,12],
-  ['THGJ 加拿大专线','VIP','空运专线','加拿大',500,95,500,42,12,8,14],
-  ['THGJ 英国专线','VIP','空运专线','英国',500,78,500,30,10,8,13],
-  ['THGJ 德国专线','VIP','空运专线','德国',500,80,500,32,10,8,14],
-  ['优包裹 美国特惠','特惠','空运专线','美国',1000,128,1000,58,8,10,18],
-  ['优包裹 英国特惠','特惠','空运专线','英国',1000,108,1000,48,7,10,17],
-  ['联云 美国经济小包','慢线','经济小包','美国',100,25,100,8,5,15,25],
-  ['联云 日本经济小包','慢线','经济小包','日本',100,18,100,5.5,3,10,16],
-  ['速腾 美国全球快递','快线','商业快递','美国',500,168,500,72,15,4,8],
-  ['速腾 英国全球快递','快线','商业快递','英国',500,148,500,65,14,4,7],
-  ['海达 美国海运大货','海运','海运专线','美国',5000,280,1000,35,0,25,40]
-];
-
-function buildDefaultData(){
+function buildDefaultData() {
   return {
-    origins:['深圳','广州','义乌','杭州','上海','北京'],
-    dests:['美国','加拿大','英国','德国','法国','澳大利亚','日本','新加坡'],
-    routes: RAW_DEFAULT.map((r,i)=>({
-      id:'r'+(i+1),
-      name:r[0], tag:r[1], type:r[2], dest:r[3],
-      origins:[],
-      firstWeight:r[4], firstPrice:r[5],
-      addWeight:r[6], addPrice:r[7],
-      fuelRate:r[8], etaMin:r[9], etaMax:r[10]
-    }))
+    settings: {
+      announcement: '系统已升级至全新版本，线路计费规则更加精准！',
+      phone: '400-888-8888',
+      wechat: 'kuaixian888',
+      address: '广东省深圳市宝安区国际物流园A栋'
+    },
+    countries: [
+      { id: 'c1', name: '美国' },
+      { id: 'c2', name: '英国' },
+      { id: 'c3', name: '日本' }
+    ],
+    lines: [
+      { 
+        id: 'l1', name: 'US-FedEx 特快', icon: '', enabled: 1, website: 'www.fedex.com', sender: '深圳', carrier: 'FedEx', 
+        forbiddenServices: ['极简包装'], features: '时效快，可跟踪。', prohibited: '易燃易爆品。' 
+      },
+      { 
+        id: 'l2', name: 'UK-EMS 经济小包', icon: '', enabled: 1, website: 'www.ems.com', sender: '义乌', carrier: 'EMS', 
+        forbiddenServices: [], features: '价格实惠。', prohibited: '违禁药品。' 
+      }
+    ],
+    configs: [
+      { 
+        id: 'cfg1', lineId: 'l1', countryId: 'c1', enabled: 1, deliveryCycle: '4-7天', 
+        minWeight: 500, maxWeight: 30000, volDivisor: 5000, volRule: 1, priceType: 'first_add',
+        firstWeight: 500, firstPrice: 120, addWeight: 500, addPrice: 45,
+        serviceFee: 0, customsFee: 20, fuelRate: 15, operationFee: 10,
+        maxLength: 100, secondLength: 80, minGirth: 200, maxGirth: 300,
+        declareType: 'required', currency: 'USD', features: '', prohibited: ''
+      },
+      { 
+        id: 'cfg2', lineId: 'l2', countryId: 'c2', enabled: 1, deliveryCycle: '7-15天', 
+        minWeight: 1, maxWeight: 5000, volDivisor: 6000, volRule: 0, priceType: 'first_add',
+        firstWeight: 100, firstPrice: 25, addWeight: 100, addPrice: 8,
+        serviceFee: 5, customsFee: 0, fuelRate: 0, operationFee: 5,
+        maxLength: 60, secondLength: 50, minGirth: 120, maxGirth: 180,
+        declareType: 'forbidden', currency: 'GBP', features: '小包首选', prohibited: ''
+      }
+    ]
   };
 }
 
 let DB = loadData();
-
-function loadData(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw){
-      const d = JSON.parse(raw);
-      if(d && Array.isArray(d.routes) && Array.isArray(d.origins) && Array.isArray(d.dests)){
-        return d;
-      }
+function loadData() {
+  try {
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      let d = JSON.parse(raw);
+      if (d && d.lines && d.countries && d.configs) return d;
     }
-  }catch(e){}
-  const d = buildDefaultData();
+  } catch(e) {}
+  let d = buildDefaultData();
   saveData(d);
   return d;
 }
-function saveData(d){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
-  catch(e){ alert('保存失败：浏览器可能禁用了本地存储。请勿使用无痕模式打开。'); }
-}
+function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
 
 /* =========================================================
-   通用工具
+   2. 通用工具
    ========================================================= */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
-const uid = () => 'r' + Date.now() + Math.floor(Math.random()*1000);
+const uid = (p='id') => p + Date.now() + Math.floor(Math.random()*1000);
+const num = (v, def) => isFinite(Number(v)) ? Number(v) : def;
+const esc = s => String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-function fmtWeight(g){
-  if(g >= 1000 && g % 1000 === 0) return (g/1000) + 'kg';
-  if(g >= 1000) return (g/1000).toFixed(2).replace(/0+$/,'').replace(/\.$/,'') + 'kg';
-  return g + 'g';
-}
-function num(v, def){
-  const n = Number(v);
-  return isFinite(n) ? n : def;
-}
-function esc(s){
-  return String(s==null?'':s).replace(/[&<>"']/g, m=>({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  })[m]);
-}
+function closeModal(id) { $('#' + id).classList.remove('show'); }
+function openModal(id) { $('#' + id).classList.add('show'); }
 
 /* =========================================================
-   计价函数
+   3. 主题与导航切换
    ========================================================= */
-function calcPrice(route, weightGrams){
-  const fw = num(route.firstWeight, 500);
-  const fp = num(route.firstPrice, 0);
-  const aw = num(route.addWeight, 500);
-  const ap = num(route.addPrice, 0);
-  const fuel = num(route.fuelRate, 0);
-  let base;
-  if(weightGrams <= fw){
-    base = fp;
-  }else{
-    const extra = Math.ceil((weightGrams - fw) / aw);
-    base = fp + extra * ap;
-  }
-  return base * (1 + fuel/100);
-}
+const themeToggleBtn = $('#themeToggle');
+const currentTheme = localStorage.getItem('theme') || 'light';
+document.documentElement.setAttribute('data-theme', currentTheme);
+if (currentTheme === 'dark') themeToggleBtn.textContent = '☀️';
 
-/* =========================================================
-   视图切换与登录逻辑
-   ========================================================= */
-function switchView(viewName) {
-  $$('.tab').forEach(b => b.classList.toggle('active', b.dataset.view === viewName));
-  $$('.view').forEach(v => v.classList.remove('active'));
-  $('#view-' + viewName).classList.add('active');
-  
-  if(viewName === 'query'){ renderEstimateSelect(); }
-  if(viewName === 'admin'){ 
-    $('#adminCurrentUser').textContent = AUTH.username;
-    renderAdmin(); 
-  }
-}
+themeToggleBtn.addEventListener('click', () => {
+  const now = document.documentElement.getAttribute('data-theme');
+  const next = now === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  themeToggleBtn.textContent = next === 'dark' ? '☀️' : '🌙';
+});
 
 $$('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const targetView = btn.dataset.view;
-    if (targetView === 'admin' && sessionStorage.getItem('logistics_logged_in') !== 'true') {
-      $('#loginUser').value = '';
-      $('#loginPass').value = '';
-      $('#loginError').textContent = '';
-      $('#loginMask').classList.add('show');
+    if (targetView === 'admin' && sessionStorage.getItem('logged_in') !== 'true') {
+      $('#loginUser').value = ''; $('#loginPass').value = ''; $('#loginError').textContent = '';
+      openModal('loginMask');
       return;
     }
-    switchView(targetView);
+    $$('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    $$('.view').forEach(v => v.classList.remove('active'));
+    $('#view-' + targetView).classList.add('active');
+    
+    if (targetView === 'query') { initFrontend(); }
+    else { initAdmin(); }
   });
 });
 
-$('#loginSubmit').addEventListener('click', () => {
-  const u = $('#loginUser').value.trim();
-  const p = $('#loginPass').value;
-  if (u === AUTH.username && p === AUTH.password) {
-    sessionStorage.setItem('logistics_logged_in', 'true');
-    $('#loginMask').classList.remove('show');
-    switchView('admin');
+/* =========================================================
+   4. 后台管理逻辑
+   ========================================================= */
+function initAdmin() {
+  $('#adminCurrentUser').value = AUTH.username;
+  
+  // 初始化筛选下拉框
+  $('#filterCfgCountry').innerHTML = '<option value="">全部国家</option>' + DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  $('#filterCfgLine').innerHTML = '<option value="">全部线路</option>' + DB.lines.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+
+  renderAdminLines();
+  renderAdminConfigs();
+  renderAdminCountries();
+  
+  $('#cfgNotice').value = DB.settings.announcement || '';
+  $('#cfgPhone').value = DB.settings.phone || '';
+  $('#cfgWechat').value = DB.settings.wechat || '';
+  $('#cfgAddress').value = DB.settings.address || '';
+}
+
+// 菜单切换
+$$('.menu-item').forEach(item => {
+  item.addEventListener('click', () => {
+    $$('.menu-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    $$('.admin-panel').forEach(p => p.classList.remove('active'));
+    $('#' + item.dataset.target).classList.add('active');
+  });
+});
+
+// --- 模块：国际线路 ---
+function renderAdminLines() {
+  let keyword = $('#filterLineName').value.trim().toLowerCase();
+  let status = $('#filterLineStatus').value;
+  
+  let filtered = DB.lines.filter(l => {
+    let matchName = !keyword || l.name.toLowerCase().includes(keyword) || l.carrier.toLowerCase().includes(keyword);
+    let matchStatus = status === '' || l.enabled == Number(status);
+    return matchName && matchStatus;
+  });
+
+  $('#lineTbody').innerHTML = filtered.map(l => `
+    <tr>
+      <td>${l.icon ? `<img src="${l.icon}" style="width:30px;height:30px;border-radius:4px;object-fit:cover;">` : '<span style="color:var(--text-3)">无</span>'}</td>
+      <td style="font-weight:600">${esc(l.name)}</td>
+      <td>${esc(l.carrier)}</td>
+      <td>${l.enabled == 1 ? '<span style="color:var(--success)">启用</span>' : '<span style="color:var(--text-3)">未启用</span>'}</td>
+      <td>
+        <div class="op-btns">
+          <button class="link-btn" onclick="editLine('${l.id}')">编辑</button>
+          <button class="link-btn danger" onclick="delLine('${l.id}')">删除</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  if(filtered.length === 0) $('#lineTbody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3)">没有符合条件的线路</td></tr>';
+}
+
+let editingLineId = null;
+let currentIconBase64 = '';
+
+window.previewIcon = function(input) {
+  if (input.files && input.files[0]) {
+    let reader = new FileReader();
+    reader.onload = function(e) {
+      currentIconBase64 = e.target.result;
+      $('#lineIconPreview').innerHTML = `<img src="${currentIconBase64}">`;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+};
+
+$('#btnAddLine').addEventListener('click', () => {
+  editingLineId = null;
+  currentIconBase64 = '';
+  $('#lineModalTitle').textContent = '新增国际线路';
+  $('#lineIconPreview').innerHTML = '+<br><span style="font-size:12px">上传</span>';
+  $('#lineWebsite').value = ''; $('#lineSender').value = ''; $('#lineCarrier').value = '';
+  $('#lineName').value = ''; $('#lineFeatures').value = ''; $('#lineProhibited').value = '';
+  $('input[name="lineEnabled"][value="1"]').checked = true;
+  $('#lineForbiddenService').checked = false;
+  openModal('lineModal');
+});
+
+window.editLine = function(id) {
+  let l = DB.lines.find(x => x.id === id);
+  if (!l) return;
+  editingLineId = id;
+  currentIconBase64 = l.icon || '';
+  $('#lineModalTitle').textContent = '修改国际线路';
+  $('#lineIconPreview').innerHTML = l.icon ? `<img src="${l.icon}">` : '+<br><span style="font-size:12px">上传</span>';
+  $('#lineWebsite').value = l.website; $('#lineSender').value = l.sender; $('#lineCarrier').value = l.carrier;
+  $('#lineName').value = l.name; $('#lineFeatures').value = l.features; $('#lineProhibited').value = l.prohibited;
+  $(`input[name="lineEnabled"][value="${l.enabled}"]`).checked = true;
+  
+  // 仅处理极简包装
+  $('#lineForbiddenService').checked = (l.forbiddenServices || []).includes('极简包装');
+  openModal('lineModal');
+};
+
+$('#btnSaveLine').addEventListener('click', () => {
+  let name = $('#lineName').value.trim();
+  if (!name) { alert('请填写线路名称'); return; }
+  
+  let forbiddenServices = [];
+  if ($('#lineForbiddenService').checked) forbiddenServices.push('极简包装');
+
+  let payload = {
+    name: name, icon: currentIconBase64, enabled: Number($('input[name="lineEnabled"]:checked').value),
+    website: $('#lineWebsite').value.trim(), sender: $('#lineSender').value, carrier: $('#lineCarrier').value,
+    forbiddenServices: forbiddenServices, features: $('#lineFeatures').value.trim(), prohibited: $('#lineProhibited').value.trim()
+  };
+
+  if (editingLineId) {
+    let idx = DB.lines.findIndex(x => x.id === editingLineId);
+    DB.lines[idx] = Object.assign({}, DB.lines[idx], payload);
   } else {
-    $('#loginError').textContent = '账号或密码错误，请重试';
+    DB.lines.push(Object.assign({ id: uid('l') }, payload));
+  }
+  saveData(DB); closeModal('lineModal'); renderAdminLines();
+});
+
+window.delLine = function(id) {
+  if (confirm('删除线路会同时删除相关的线路配置，确定吗？')) {
+    DB.lines = DB.lines.filter(x => x.id !== id);
+    DB.configs = DB.configs.filter(x => x.lineId !== id);
+    saveData(DB); renderAdminLines(); renderAdminConfigs();
+  }
+};
+
+
+// --- 模块：线路配置 ---
+function renderAdminConfigs() {
+  let fCountry = $('#filterCfgCountry').value;
+  let fLine = $('#filterCfgLine').value;
+  let fStatus = $('#filterCfgStatus').value;
+
+  let filtered = DB.configs.filter(c => {
+    let matchC = fCountry === '' || c.countryId === fCountry;
+    let matchL = fLine === '' || c.lineId === fLine;
+    let matchS = fStatus === '' || c.enabled == Number(fStatus);
+    return matchC && matchL && matchS;
+  });
+
+  $('#configTbody').innerHTML = filtered.map(c => {
+    let line = DB.lines.find(l => l.id === c.lineId) || { name: '未知线路' };
+    let country = DB.countries.find(ct => ct.id === c.countryId) || { name: '未知国家' };
+    let ruleStr = `首重${c.firstWeight}g/¥${c.firstPrice} + 续重${c.addWeight}g/¥${c.addPrice}`;
+    return `
+      <tr>
+        <td style="font-weight:600">${esc(line.name)}</td>
+        <td>${esc(country.name)}</td>
+        <td style="font-size:12px;color:var(--text-2)">${ruleStr}</td>
+        <td>${c.enabled == 1 ? '<span style="color:var(--success)">启用</span>' : '<span style="color:var(--text-3)">未启用</span>'}</td>
+        <td>
+          <div class="op-btns">
+            <button class="link-btn" onclick="editConfig('${c.id}')">编辑</button>
+            <button class="link-btn danger" onclick="delConfig('${c.id}')">删除</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  if(filtered.length === 0) $('#configTbody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3)">没有符合条件的配置</td></tr>';
+}
+
+let editingConfigId = null;
+
+$('#btnAddConfig').addEventListener('click', () => {
+  if (DB.lines.length === 0 || DB.countries.length === 0) { alert('请先添加国际线路和国家'); return; }
+  editingConfigId = null;
+  $('#configModalTitle').textContent = '新增线路配置';
+  $('#cfgLineId').innerHTML = DB.lines.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  $('#cfgCountryId').innerHTML = DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  
+  // 重置表单
+  $('#cfgDeliveryCycle').value = '';
+  $('#cfgMinWeight').value = 1; $('#cfgMaxWeight').value = 30000; $('#cfgVolDivisor').value = 6000;
+  $('#cfgVolRule').value = '0'; $('input[name="cfgPriceType"][value="first_add"]').checked = true;
+  $('#cfgFirstWeight').value = 500; $('#cfgFirstPrice').value = 0;
+  $('#cfgAddWeight').value = 500; $('#cfgAddPrice').value = 0;
+  $('#cfgServiceFee').value = 0; $('#cfgCustomsFee').value = 0; $('#cfgFuelRate').value = 0; $('#cfgOperationFee').value = 0;
+  $('#cfgMaxLength').value = 100; $('#cfgSecondLength').value = 80; $('#cfgMinGirth').value = 200; $('#cfgMaxGirth').value = 300;
+  $('input[name="cfgDeclareType"][value="forbidden"]').checked = true; $('#cfgCurrency').value = 'USD';
+  $('#cfgFeatures').value = ''; $('#cfgProhibited').value = '';
+  $('input[name="cfgEnabled"][value="1"]').checked = true;
+  
+  openModal('configModal');
+});
+
+window.editConfig = function(id) {
+  let c = DB.configs.find(x => x.id === id);
+  if (!c) return;
+  editingConfigId = id;
+  $('#configModalTitle').textContent = '修改线路配置';
+  $('#cfgLineId').innerHTML = DB.lines.map(l => `<option value="${l.id}" ${l.id === c.lineId ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+  $('#cfgCountryId').innerHTML = DB.countries.map(ct => `<option value="${ct.id}" ${ct.id === c.countryId ? 'selected' : ''}>${esc(ct.name)}</option>`).join('');
+  
+  $('#cfgDeliveryCycle').value = c.deliveryCycle || '';
+  $('#cfgMinWeight').value = c.minWeight; $('#cfgMaxWeight').value = c.maxWeight; $('#cfgVolDivisor').value = c.volDivisor;
+  $('#cfgVolRule').value = c.volRule;
+  $(`input[name="cfgPriceType"][value="${c.priceType}"]`).checked = true;
+  $('#cfgFirstWeight').value = c.firstWeight; $('#cfgFirstPrice').value = c.firstPrice;
+  $('#cfgAddWeight').value = c.addWeight; $('#cfgAddPrice').value = c.addPrice;
+  $('#cfgServiceFee').value = c.serviceFee; $('#cfgCustomsFee').value = c.customsFee; $('#cfgFuelRate').value = c.fuelRate; $('#cfgOperationFee').value = c.operationFee;
+  $('#cfgMaxLength').value = c.maxLength; $('#cfgSecondLength').value = c.secondLength; $('#cfgMinGirth').value = c.minGirth; $('#cfgMaxGirth').value = c.maxGirth;
+  $(`input[name="cfgDeclareType"][value="${c.declareType}"]`).checked = true; $('#cfgCurrency').value = c.currency;
+  $('#cfgFeatures').value = c.features || ''; $('#cfgProhibited').value = c.prohibited || '';
+  $(`input[name="cfgEnabled"][value="${c.enabled}"]`).checked = true;
+  
+  openModal('configModal');
+};
+
+$('#btnSaveConfig').addEventListener('click', () => {
+  let payload = {
+    lineId: $('#cfgLineId').value, countryId: $('#cfgCountryId').value,
+    enabled: Number($('input[name="cfgEnabled"]:checked').value),
+    deliveryCycle: $('#cfgDeliveryCycle').value.trim(),
+    minWeight: num($('#cfgMinWeight').value, 1), maxWeight: num($('#cfgMaxWeight').value, 30000),
+    volDivisor: num($('#cfgVolDivisor').value, 6000), volRule: Number($('#cfgVolRule').value),
+    priceType: $('input[name="cfgPriceType"]:checked').value,
+    firstWeight: num($('#cfgFirstWeight').value, 500), firstPrice: num($('#cfgFirstPrice').value, 0),
+    addWeight: num($('#cfgAddWeight').value, 500), addPrice: num($('#cfgAddPrice').value, 0),
+    serviceFee: num($('#cfgServiceFee').value, 0), customsFee: num($('#cfgCustomsFee').value, 0),
+    fuelRate: num($('#cfgFuelRate').value, 0), operationFee: num($('#cfgOperationFee').value, 0),
+    maxLength: num($('#cfgMaxLength').value, 0), secondLength: num($('#cfgSecondLength').value, 0),
+    minGirth: num($('#cfgMinGirth').value, 0), maxGirth: num($('#cfgMaxGirth').value, 0),
+    declareType: $('input[name="cfgDeclareType"]:checked').value, currency: $('#cfgCurrency').value,
+    features: $('#cfgFeatures').value.trim(), prohibited: $('#cfgProhibited').value.trim()
+  };
+
+  if (editingConfigId) {
+    let idx = DB.configs.findIndex(x => x.id === editingConfigId);
+    DB.configs[idx] = Object.assign({}, DB.configs[idx], payload);
+  } else {
+    DB.configs.push(Object.assign({ id: uid('cfg') }, payload));
+  }
+  saveData(DB); closeModal('configModal'); renderAdminConfigs();
+});
+
+window.delConfig = function(id) {
+  if (confirm('确定删除该线路配置吗？')) {
+    DB.configs = DB.configs.filter(x => x.id !== id);
+    saveData(DB); renderAdminConfigs();
+  }
+};
+
+// --- 模块：国家配置 ---
+function renderAdminCountries() {
+  $('#countryTbody').innerHTML = DB.countries.map(c => `
+    <tr>
+      <td style="font-weight:600">${esc(c.name)}</td>
+      <td>
+        <div class="op-btns">
+          <button class="link-btn danger" onclick="delCountry('${c.id}')">删除</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// 批量添加国家逻辑
+$('#btnAddCountry').addEventListener('click', () => {
+  let str = $('#batchCountryInput').value;
+  if (!str.trim()) return;
+  
+  // 按逗号、空格、顿号分割
+  let names = str.split(/[,，\s、]+/).map(n => n.trim()).filter(Boolean);
+  let addedCount = 0;
+  let duplicateCount = 0;
+
+  names.forEach(name => {
+    if (!DB.countries.find(c => c.name === name)) {
+      DB.countries.push({ id: uid('c'), name: name });
+      addedCount++;
+    } else {
+      duplicateCount++;
+    }
+  });
+
+  if (addedCount > 0) {
+    saveData(DB); 
+    renderAdminCountries(); 
+    // 更新配置筛选框
+    $('#filterCfgCountry').innerHTML = '<option value="">全部国家</option>' + DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    $('#batchCountryInput').value = '';
+  }
+  
+  alert(`成功添加 ${addedCount} 个国家${duplicateCount>0 ? `，${duplicateCount} 个已存在被忽略` : ''}`);
+});
+
+window.delCountry = function(id) {
+  if (confirm('删除国家会同时删除相关的线路配置，确定吗？')) {
+    DB.countries = DB.countries.filter(x => x.id !== id);
+    DB.configs = DB.configs.filter(x => x.countryId !== id);
+    saveData(DB); renderAdminCountries(); renderAdminConfigs();
+  }
+};
+
+// --- 模块：公告与联系方式 ---
+$('#btnSaveNotice').addEventListener('click', () => {
+  DB.settings.announcement = $('#cfgNotice').value.trim();
+  saveData(DB); alert('公告已保存');
+});
+
+$('#btnSaveContact').addEventListener('click', () => {
+  DB.settings.phone = $('#cfgPhone').value.trim();
+  DB.settings.wechat = $('#cfgWechat').value.trim();
+  DB.settings.address = $('#cfgAddress').value.trim();
+  saveData(DB); alert('联系方式已保存');
+});
+
+// --- 模块：登录与密码 ---
+$('#loginSubmit').addEventListener('click', () => {
+  if ($('#loginUser').value.trim() === AUTH.username && $('#loginPass').value === AUTH.password) {
+    sessionStorage.setItem('logged_in', 'true');
+    closeModal('loginMask');
+    $$('.tab').forEach(b => b.classList.remove('active'));
+    $('.tab[data-view="admin"]').classList.add('active');
+    $$('.view').forEach(v => v.classList.remove('active'));
+    $('#view-admin').classList.add('active');
+    initAdmin();
+  } else {
+    $('#loginError').textContent = '账号或密码错误';
   }
 });
-$('#loginPass').addEventListener('keydown', e => { if(e.key === 'Enter') $('#loginSubmit').click(); });
-$('#loginClose').addEventListener('click', () => $('#loginMask').classList.remove('show'));
-$('#loginCancel').addEventListener('click', () => $('#loginMask').classList.remove('show'));
-
+$('#loginClose').addEventListener('click', () => closeModal('loginMask'));
+$('#loginCancel').addEventListener('click', () => closeModal('loginMask'));
 $('#btnLogout').addEventListener('click', () => {
-  if(confirm('确定退出当前账号吗？')) {
-    sessionStorage.removeItem('logistics_logged_in');
-    switchView('query');
-  }
+  sessionStorage.removeItem('logged_in');
+  $$('.tab').forEach(b => b.classList.remove('active'));
+  $('.tab[data-view="query"]').classList.add('active');
+  $$('.view').forEach(v => v.classList.remove('active'));
+  $('#view-query').classList.add('active');
+  initFrontend();
 });
 
-$('#btnChangePass').addEventListener('click', () => {
-  const oldP = $('#oldPass').value;
-  const newP = $('#newPass').value;
-  const newP2 = $('#newPass2').value;
-  if (oldP !== AUTH.password) { alert('原密码错误'); return; }
-  if (!newP) { alert('新密码不能为空'); return; }
-  if (newP !== newP2) { alert('两次输入的新密码不一致'); return; }
-  AUTH.password = newP;
-  localStorage.setItem(AUTH_KEY, JSON.stringify(AUTH));
+$('#btnChangePassModal').addEventListener('click', () => {
   $('#oldPass').value = ''; $('#newPass').value = ''; $('#newPass2').value = '';
-  alert('密码修改成功！');
+  openModal('passMask');
 });
+$('#passClose').addEventListener('click', () => closeModal('passMask'));
+$('#passCancel').addEventListener('click', () => closeModal('passMask'));
+$('#btnChangePass').addEventListener('click', () => {
+  if ($('#oldPass').value !== AUTH.password) { alert('原密码错误'); return; }
+  if (!$('#newPass').value) { alert('新密码不能为空'); return; }
+  if ($('#newPass').value !== $('#newPass2').value) { alert('两次密码不一致'); return; }
+  AUTH.password = $('#newPass').value;
+  localStorage.setItem(AUTH_KEY, JSON.stringify(AUTH));
+  closeModal('passMask'); alert('密码修改成功');
+});
+
 
 /* =========================================================
-   前台 - 估价器逻辑
+   5. 前台查询与计算逻辑
    ========================================================= */
-let currentMode = 'shoe'; // 'shoe' or 'weight'
+function initFrontend() {
+  // 渲染公告
+  if (DB.settings.announcement) {
+    $('#noticeContent').textContent = DB.settings.announcement;
+    $('#noticeContainer').classList.remove('hide');
+  } else {
+    $('#noticeContainer').classList.add('hide');
+  }
+  
+  // 渲染联系方式
+  $('#footerContacts').innerHTML = `
+    <div class="contact-item"><span style="font-size:20px;">📞</span> <span>客服电话：<strong>${esc(DB.settings.phone)}</strong></span></div>
+    <div class="contact-item"><span style="font-size:20px;">💬</span> <span>微信客服：<strong>${esc(DB.settings.wechat)}</strong></span></div>
+    <div class="contact-item"><span style="font-size:20px;">📍</span> <span>公司地址：${esc(DB.settings.address)}</span></div>
+  `;
+
+  // 渲染国家下拉
+  let sel = $('#estDestSelect');
+  sel.innerHTML = '<option value="">请选择国家</option>' + DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+}
+
+// 模式切换
+let currentMode = 'shoe';
+$$('.method-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.method-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    $('#modeShoe').style.display = currentMode === 'shoe' ? 'block' : 'none';
+    $('#modeWeight').style.display = currentMode === 'weight' ? 'block' : 'none';
+  });
+});
 
 $('#addShoeBtn').addEventListener('click', () => {
-  const div = document.createElement('div');
+  let div = document.createElement('div');
   div.className = 'shoe-row';
   div.innerHTML = `
-    <input type="text" placeholder="型号，例如 Kobe" class="shoe-model">
+    <input type="text" placeholder="型号" class="shoe-model">
     <input type="number" placeholder="尺码" class="shoe-size">
     <input type="number" placeholder="双数" value="1" class="shoe-qty">
     <button class="remove-shoe" onclick="this.parentNode.remove()">×</button>
@@ -557,301 +1186,163 @@ $('#addShoeBtn').addEventListener('click', () => {
   $('#shoeList').appendChild(div);
 });
 
-function fillShoe(modelName) {
-  const rows = $$('#shoeList .shoe-row');
-  let targetRow = null;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const inp = rows[i].querySelector('.shoe-model');
-    if (!inp.value) {
-      targetRow = rows[i];
-      break;
-    }
-  }
-  if (!targetRow) {
-    $('#addShoeBtn').click();
-    targetRow = $$('#shoeList .shoe-row').pop();
-  }
-  targetRow.querySelector('.shoe-model').value = modelName;
-  targetRow.querySelector('.shoe-size').focus();
-}
+window.fillShoe = function(name) {
+  let rows = $$('#shoeList .shoe-row');
+  let target = Array.from(rows).reverse().find(r => !r.querySelector('.shoe-model').value);
+  if (!target) { $('#addShoeBtn').click(); target = $$('#shoeList .shoe-row').pop(); }
+  target.querySelector('.shoe-model').value = name;
+  target.querySelector('.shoe-size').focus();
+};
 
-$$('.method-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    $$('.method-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentMode = btn.dataset.mode;
-    
-    if (currentMode === 'shoe') {
-      $('#modeShoe').style.display = 'block';
-      $('#modeWeight').style.display = 'none';
-    } else {
-      $('#modeShoe').style.display = 'none';
-      $('#modeWeight').style.display = 'block';
-    }
-    $('#estimateResultsContainer').style.display = 'none';
-  });
-});
-
+// --- 核心：计算价格 ---
 $('#btnEstimate').addEventListener('click', () => {
-  const dest = $('#estDestSelect').value;
-  if (!dest) { alert('请先选择目的地国家'); return; }
+  let countryId = $('#estDestSelect').value;
+  if (!countryId) { alert('请选择目的地国家'); return; }
 
-  let totalWeightGrams = 0;
+  let actualWeightGrams = 0;
+  let totalVolGrams = 0;
   let detailStr = '';
 
   if (currentMode === 'shoe') {
-    const rows = $$('#shoeList .shoe-row');
-    let totalPairs = 0;
-    rows.forEach(row => {
-      const qty = num(row.querySelector('.shoe-qty').value, 0);
-      totalPairs += qty;
-    });
-    if (totalPairs <= 0) { alert('请至少填写一双鞋子的数量'); return; }
-    
-    totalWeightGrams = totalPairs * 1200;
-    detailStr = `共 ${totalPairs} 双鞋，按每双约 1.2kg 估算（含鞋盒），总计约 ${(totalWeightGrams/1000).toFixed(1)}kg`;
+    let pairs = 0;
+    $$('#shoeList .shoe-row').forEach(r => { pairs += num(r.querySelector('.shoe-qty').value, 0); });
+    if (pairs <= 0) { alert('请填写鞋子数量'); return; }
+    // 估算：1双鞋 = 1.2kg，体积按 35*25*15 算
+    actualWeightGrams = pairs * 1200;
+    totalVolGrams = pairs * (35 * 25 * 15 / 5000) * 1000; 
+    detailStr = `共 ${pairs} 双，按实重估算约 ${(actualWeightGrams/1000).toFixed(1)}kg`;
   } else {
-    const actualKg = num($('#estActualWeight').value, 0);
-    const l = num($('#estLength').value, 0);
-    const w = num($('#estWidth').value, 0);
-    const h = num($('#estHeight').value, 0);
-    
+    let actualKg = num($('#estActualWeight').value, 0);
     if (actualKg <= 0) { alert('请填写实重'); return; }
-    
-    let actualGrams = actualKg * 1000;
-    let volGrams = 0;
-    
-    if (l > 0 && w > 0 && h > 0) {
-      const volKg = (l * w * h) / 5000;
-      volGrams = volKg * 1000;
+    actualWeightGrams = actualKg * 1000;
+    let l = num($('#estLength').value, 0), w = num($('#estWidth').value, 0), h = num($('#estHeight').value, 0);
+    if (l>0 && w>0 && h>0) {
+      totalVolGrams = (l * w * h / 5000) * 1000; // 此处先用默认5000，后续会按不同配置重新算
     }
-    
-    totalWeightGrams = Math.max(actualGrams, volGrams);
-    if (totalWeightGrams === 0) totalWeightGrams = actualGrams;
-    
-    if (volGrams > actualGrams) {
-      detailStr = `实重 ${actualKg}kg，材积重 ${(volGrams/1000).toFixed(2)}kg，按材积重计费`;
-    } else {
-      detailStr = `实重 ${actualKg}kg${volGrams > 0 ? `，材积重 ${(volGrams/1000).toFixed(2)}kg` : ''}，按实重计费`;
-    }
+    detailStr = `实重 ${actualKg}kg`;
   }
 
-  const matchedRoutes = DB.routes.filter(r => r.dest === dest);
+  // 找到该国家下所有启用的配置
+  let validConfigs = DB.configs.filter(c => c.countryId === countryId && c.enabled == 1);
   
-  if (!matchedRoutes.length) {
-    $('#estimateResultsContainer').style.display = 'block';
-    $('#estimateResultsList').innerHTML = '<div style="color:var(--text-3); font-size:13px; padding:10px 0;">该国家暂无可用线路</div>';
+  if (validConfigs.length === 0) {
+    $('#emptyResultTip').style.display = 'none';
+    $('#estimateResultsList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">该国家暂无可用线路配置</div>';
     return;
   }
 
-  $('#estimateResultsContainer').style.display = 'block';
-  
-  const resultData = matchedRoutes.map(route => {
-    return {
-      route,
-      price: calcPrice(route, totalWeightGrams)
-    };
-  }).sort((a, b) => a.price - b.price);
+  let results = [];
 
-  $('#estimateResultsList').innerHTML = resultData.map(item => `
+  validConfigs.forEach(cfg => {
+    let line = DB.lines.find(l => l.id === cfg.lineId);
+    if (!line || line.enabled != 1) return; // 线路未启用
+
+    // 1. 判断体积重与计抛规则
+    let calcWeightGrams = actualWeightGrams;
+    let volText = '';
+    
+    // 计算实际材积重
+    let currentVolGrams = 0;
+    if (currentMode === 'weight') {
+      let l = num($('#estLength').value, 0), w = num($('#estWidth').value, 0), h = num($('#estHeight').value, 0);
+      if (l>0 && w>0 && h>0) {
+        currentVolGrams = (l * w * h / cfg.volDivisor) * 1000;
+      }
+    } else if (currentMode === 'shoe') {
+      // 鞋子模式估算体积重（需动态按该配置的基数算，鞋子默认尺寸：35x25x15）
+      currentVolGrams = (35 * 25 * 15 / cfg.volDivisor) * 1000 * (actualWeightGrams / 1200);
+    }
+
+    // 应用规则
+    if (cfg.volRule == 1) { // 取最大值
+      if (currentVolGrams > actualWeightGrams) {
+        calcWeightGrams = currentVolGrams;
+        volText = ` (材积重 ${(currentVolGrams/1000).toFixed(2)}kg)`;
+      }
+    } else { // 实际重量
+      calcWeightGrams = actualWeightGrams;
+    }
+
+    // 2. 判断重量限制
+    if (calcWeightGrams < cfg.minWeight) calcWeightGrams = cfg.minWeight; // 最低消费重量
+    if (calcWeightGrams > cfg.maxWeight) return; // 超过最高限制，不可用
+
+    // 3. 计算基础运费
+    let basePrice = 0;
+    if (calcWeightGrams <= cfg.firstWeight) {
+      basePrice = cfg.firstPrice;
+    } else {
+      let extra = Math.ceil((calcWeightGrams - cfg.firstWeight) / cfg.addWeight);
+      basePrice = cfg.firstPrice + extra * cfg.addPrice;
+    }
+
+    // 4. 附加费计算
+    let fuelCost = basePrice * (cfg.fuelRate / 100);
+    let serviceCost = basePrice * (cfg.serviceFee / 100);
+    let totalPrice = basePrice + fuelCost + serviceCost + cfg.customsFee + cfg.operationFee;
+
+    results.push({
+      line: line, cfg: cfg, price: totalPrice, calcWeight: calcWeightGrams, volText: volText
+    });
+  });
+
+  if (results.length === 0) {
+    $('#emptyResultTip').style.display = 'none';
+    $('#estimateResultsList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">包裹重量或尺寸超出该国家所有线路的限制</div>';
+    return;
+  }
+
+  // 按价格排序
+  results.sort((a,b) => a.price - b.price);
+
+  $('#emptyResultTip').style.display = 'none';
+  $('#estimateResultsList').innerHTML = results.map(r => `
     <div class="route-card">
       <div class="card-top">
-        <div>
-          <span class="carrier-name">${esc(item.route.name)}</span>
-          ${item.route.tag ? `<span class="tag">${esc(item.route.tag)}</span>` : ''}
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${r.line.icon ? `<img src="${r.line.icon}" style="width:40px;height:40px;border-radius:8px;border:1px solid var(--border);">` : `<div style="width:40px;height:40px;background:var(--primary-light);color:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;">${r.line.name.charAt(0)}</div>`}
+          <div>
+            <div class="carrier-name">${esc(r.line.name)} <span class="tag">${esc(r.line.carrier)}</span></div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:4px;">${esc(r.cfg.deliveryCycle)} · 由 ${esc(r.line.sender)} 发出</div>
+          </div>
         </div>
         <div class="price">
-          <span class="amount">¥${item.price.toFixed(1)}</span>
-          <span class="unit">预估总价</span>
+          <span class="amount">¥${r.price.toFixed(2)}</span>
+          <span style="font-size:12px;color:var(--text-3)">预估总价</span>
         </div>
       </div>
+      
       <div class="card-info">
-        <span>${esc(item.route.type || '专线')}</span>
-        <span>${item.route.etaMin}-${item.route.etaMax} 天</span>
+        <span>⚖️ 计费重: ${(r.calcWeight/1000).toFixed(2)}kg ${r.volText}</span>
+        <span>⏱ ${r.cfg.deliveryCycle}</span>
+        <span>📦 首重${r.cfg.firstWeight}g/¥${r.cfg.firstPrice} + 续重${r.cfg.addWeight}g/¥${r.cfg.addPrice}</span>
       </div>
+
+      ${r.line.forbiddenServices && r.line.forbiddenServices.length ? `
+        <div style="font-size:12px;color:var(--danger);margin-bottom:12px;">
+          <strong>不支持服务：</strong> ${r.line.forbiddenServices.join(', ')}
+        </div>
+      ` : ''}
+
       <div class="card-rule">
-        <strong>计费：</strong>首重 ${fmtWeight(item.route.firstWeight)} / ¥${item.route.firstPrice} · 续重 ${fmtWeight(item.route.addWeight)} / ¥${item.route.addPrice} ${item.route.fuelRate > 0 ? `· 燃油 ${item.route.fuelRate}%` : ''}
-        <br><span>${detailStr}</span>
+        <div style="margin-bottom:4px;"><strong>线路特点：</strong> ${esc(r.cfg.features || r.line.features || '无')}</div>
+        <div><strong>禁寄物品：</strong> ${esc(r.cfg.prohibited || r.line.prohibited || '无')}</div>
+        ${r.cfg.customsFee > 0 || r.cfg.fuelRate > 0 || r.cfg.operationFee > 0 ? `
+          <div style="margin-top:8px; border-top:1px dashed var(--border); padding-top:8px; color:var(--text-2)">
+            费用明细：基础运费 ¥${(r.price - r.cfg.customsFee - r.cfg.operationFee).toFixed(2)} 
+            ${r.cfg.fuelRate>0 ? `| 燃油费(${r.cfg.fuelRate}%) ` : ''} 
+            ${r.cfg.customsFee>0 ? `| 报关费 ¥${r.cfg.customsFee} ` : ''} 
+            ${r.cfg.operationFee>0 ? `| 操作费 ¥${r.cfg.operationFee}` : ''}
+          </div>
+        ` : ''}
       </div>
     </div>
   `).join('');
 });
 
-function renderEstimateSelect() {
-  const sel = $('#estDestSelect');
-  const prev = sel.value;
-  sel.innerHTML = DB.dests.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
-  if (DB.dests.includes(prev)) sel.value = prev;
-}
+// 页面初始化
+initFrontend();
 
-/* =========================================================
-   后台管理逻辑
-   ========================================================= */
-function renderAdmin(){
-  const tbody = $('#adminTbody');
-  tbody.innerHTML = DB.routes.map(r=>`
-    <tr>
-      <td>
-        <div class="name">${esc(r.name)}</div>
-        <div class="sub">${esc(r.type||'')} ${r.tag?'· '+esc(r.tag):''}</div>
-      </td>
-      <td>${esc(r.dest)}</td>
-      <td>${fmtWeight(r.firstWeight)}/¥${r.firstPrice}<br>${fmtWeight(r.addWeight)}/¥${r.addPrice}</td>
-      <td>${r.etaMin}-${r.etaMax} 天</td>
-      <td>
-        <div class="op-btns">
-          <button class="link-btn" data-edit="${r.id}">编辑</button>
-          <button class="link-btn danger" data-del="${r.id}">删除</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-
-  $('#cfgDests').value = DB.dests.join(',');
-
-  tbody.querySelectorAll('[data-edit]').forEach(b=>{
-    b.addEventListener('click', ()=> openModal(b.dataset.edit));
-  });
-  tbody.querySelectorAll('[data-del]').forEach(b=>{
-    b.addEventListener('click', ()=>{
-      if(confirm('确定删除该线路吗？')){
-        DB.routes = DB.routes.filter(x=>x.id !== b.dataset.del);
-        saveData(DB); renderAdmin(); renderEstimateSelect();
-      }
-    });
-  });
-}
-
-let editingId = null;
-
-function openModal(id){
-  editingId = id || null;
-  $('#modalTitle').textContent = id ? '编辑线路' : '新增线路';
-  $('#fDest').innerHTML = DB.dests.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
-
-  if(id){
-    const r = DB.routes.find(x=>x.id === id);
-    if(!r) return;
-    $('#fName').value = r.name || '';
-    $('#fTag').value = r.tag || '';
-    $('#fType').value = r.type || '';
-    $('#fDest').value = r.dest || (DB.dests[0]||'');
-    $('#fFirstWeight').value = r.firstWeight;
-    $('#fFirstPrice').value = r.firstPrice;
-    $('#fAddWeight').value = r.addWeight;
-    $('#fAddPrice').value = r.addPrice;
-    $('#fFuel').value = r.fuelRate;
-    $('#fEtaMin').value = r.etaMin;
-    $('#fEtaMax').value = r.etaMax;
-  }else{
-    $('#fName').value = ''; $('#fTag').value = ''; $('#fType').value = '';
-    $('#fDest').value = DB.dests[0] || '';
-    $('#fFirstWeight').value = 500; $('#fFirstPrice').value = 88;
-    $('#fAddWeight').value = 500; $('#fAddPrice').value = 35;
-    $('#fFuel').value = 0; $('#fEtaMin').value = 7; $('#fEtaMax').value = 12;
-  }
-  $('#modalMask').classList.add('show');
-}
-
-function closeModal(){ $('#modalMask').classList.remove('show'); editingId = null; }
-$('#modalClose').addEventListener('click', closeModal);
-$('#modalCancel').addEventListener('click', closeModal);
-
-$('#modalSave').addEventListener('click', ()=>{
-  const name = $('#fName').value.trim();
-  const dest = $('#fDest').value;
-  if(!name){ alert('请填写线路名称'); return; }
-
-  const fw = num($('#fFirstWeight').value, 0);
-  const fp = num($('#fFirstPrice').value, -1);
-  const aw = num($('#fAddWeight').value, 0);
-  const ap = num($('#fAddPrice').value, -1);
-  if(fw <= 0 || aw <= 0){ alert('重量必须大于 0'); return; }
-  if(fp < 0 || ap < 0){ alert('价格不能为负数'); return; }
-
-  const payload = {
-    name, tag: $('#fTag').value.trim(), type: $('#fType').value.trim(), dest, origins: [],
-    firstWeight: fw, firstPrice: fp, addWeight: aw, addPrice: ap,
-    fuelRate: num($('#fFuel').value, 0),
-    etaMin: Math.max(1, num($('#fEtaMin').value, 1)),
-    etaMax: Math.max(1, num($('#fEtaMax').value, 1))
-  };
-
-  if(editingId){
-    const idx = DB.routes.findIndex(r=>r.id === editingId);
-    if(idx >= 0) DB.routes[idx] = Object.assign({}, DB.routes[idx], payload);
-  }else{
-    DB.routes.push(Object.assign({ id: uid() }, payload));
-  }
-  saveData(DB); closeModal(); renderAdmin(); renderEstimateSelect();
-});
-
-$('#btnAdd').addEventListener('click', ()=> openModal(null));
-
-$('#btnSaveBase').addEventListener('click', ()=>{
-  const dests = $('#cfgDests').value.split(',').map(s=>s.trim()).filter(Boolean);
-  if(!dests.length){ alert('不能为空'); return; }
-  DB.dests = Array.from(new Set(dests));
-  saveData(DB); renderAdmin(); renderEstimateSelect(); alert('已保存');
-});
-
-$('#btnExport').addEventListener('click', ()=>{
-  let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body><table border="1"><tr>';
-  const headers = ['线路名称','标签','类型','目的地','首重(g)','首重价格(元)','续重(g)','续重价格(元)','燃油费率(%)','时效最短(天)','时效最长(天)'];
-  headers.forEach(h => html += `<th>${h}</th>`);
-  html += '</tr>';
-  DB.routes.forEach(r => {
-    html += `<tr><td>${r.name || ''}</td><td>${r.tag || ''}</td><td>${r.type || ''}</td><td>${r.dest || ''}</td><td>${r.firstWeight}</td><td>${r.firstPrice}</td><td>${r.addWeight}</td><td>${r.addPrice}</td><td>${r.fuelRate}</td><td>${r.etaMin}</td><td>${r.etaMax}</td></tr>`;
-  });
-  html += '</table></body></html>';
-  const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url;
-  a.download = '物流线路数据_' + new Date().toISOString().slice(0,10) + '.xls';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-});
-
-$('#btnImport').addEventListener('click', ()=> $('#fileInput').click());
-$('#fileInput').addEventListener('change', e=>{
-  const f = e.target.files[0]; if(!f) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      let text = new TextDecoder('utf-8').decode(ev.target.result);
-      if (text.includes('\uFFFD')) text = new TextDecoder('gbk').decode(ev.target.result);
-      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-      
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      const newRoutes = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        if (cols.length < 11) continue;
-        newRoutes.push({
-          id: uid(), name: (cols[0]||'').trim(), tag: (cols[1]||'').trim(), type: (cols[2]||'').trim(), dest: (cols[3]||'').trim(),
-          firstWeight: Number(cols[4])||500, firstPrice: Number(cols[5])||0,
-          addWeight: Number(cols[6])||500, addPrice: Number(cols[7])||0,
-          fuelRate: Number(cols[8])||0, etaMin: Number(cols[9])||7, etaMax: Number(cols[10])||12,
-          origins: []
-        });
-      }
-      if(!newRoutes.length) throw new Error('未解析到数据');
-      if(!confirm(`解析成功，共 ${newRoutes.length} 条，覆盖原有数据？`)) return;
-      DB.routes = newRoutes; saveData(DB); renderAdmin(); renderEstimateSelect(); alert('导入成功！');
-    } catch(err) { alert('导入失败：' + err.message); }
-    e.target.value = '';
-  };
-  reader.readAsArrayBuffer(f);
-});
-
-$('#btnReset').addEventListener('click', ()=>{
-  if(!confirm('恢复默认数据会清空所有修改，确定吗？')) return;
-  DB = buildDefaultData(); saveData(DB); renderAdmin(); renderEstimateSelect(); alert('已恢复默认');
-});
-
-/* =========================================================
-   启动
-   ========================================================= */
-renderEstimateSelect();
 </script>
 </body>
 </html>
