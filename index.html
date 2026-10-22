@@ -147,21 +147,12 @@
   .upload-box { width: 100px; height: 100px; border: 1px dashed var(--border); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-3); cursor: pointer; background: var(--bg); position: relative; overflow: hidden;}
   .upload-box img { width: 100%; height: 100%; object-fit: cover; }
 
-  /* 加载状态提示 */
-  .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 9999; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
-  .loading-overlay.hide { display: none; }
-
-  /* 数据文件状态提示 */
-  .data-file-status { font-size: 12px; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; }
-  .data-file-status.ok { background: var(--success); color: #fff; }
-  .data-file-status.warn { background: var(--notice-bg); color: var(--notice-text); border: 1px solid var(--notice-border); }
-  .data-file-status.off { background: var(--bg); color: var(--text-3); }
+  /* 云端状态提示 */
+  .cloud-status { position: fixed; right: 16px; bottom: 16px; z-index: 300; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 12px; color: var(--text-2); box-shadow: var(--shadow); display: none; }
+  .cloud-status.show { display: block; }
 </style>
 </head>
 <body>
-
-<!-- 加载状态 -->
-<div id="loadingOverlay" class="loading-overlay">正在加载数据文件 (data.txt) ...</div>
 
 <!-- ================= 顶部导航 ================= -->
 <header class="topbar">
@@ -170,7 +161,6 @@
     跨境物流查价系统
   </div>
   <div class="top-actions">
-    <span id="dataFileStatus" class="data-file-status off" title="数据文件写入状态">⏳ 检测中</span>
     <button class="theme-btn" id="themeToggle" title="切换暗黑/明亮模式">🌙</button>
     <nav class="tabs">
       <button class="tab active" data-view="query">前台查询</button>
@@ -298,17 +288,6 @@
               <button class="btn danger" id="btnLogout">退出登录</button>
             </div>
           </div>
-        </div>
-        <div style="margin-top: 24px; padding: 16px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
-          <div style="font-weight: 600; margin-bottom: 8px;">💾 数据文件管理</div>
-          <div style="font-size: 13px; color: var(--text-2); margin-bottom: 12px; line-height: 1.6;">
-            所有修改会实时同步到 <code>data.txt</code>。若浏览器不支持文件写入，可点击下方按钮手动导出数据文件。
-          </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <button class="btn ghost" id="btnExportData">📥 导出 data.txt</button>
-            <button class="btn ghost" id="btnReloadData">🔄 重新加载 data.txt</button>
-          </div>
-          <div id="fileSupportHint" style="margin-top: 10px; font-size: 12px;"></div>
         </div>
       </div>
 
@@ -506,6 +485,7 @@
       <div class="field">
         <label>不能使用的服务 *</label>
         <div class="radio-group" style="padding: 8px 0;">
+          <!-- 仅保留极简包装 -->
           <label><input type="checkbox" id="lineForbiddenService" value="极简包装"> 极简包装</label>
         </div>
       </div>
@@ -688,253 +668,86 @@
   </div>
 </div>
 
-<!-- ============================================================
-   数据服务模块 —— 从 data.txt 加载，并支持写回 data.txt
-   ============================================================ -->
-<script id="dataServiceScript">
-/**
- * dataService.js
- * - 启动时异步 fetch data.txt（JSON格式）加载数据。
- * - saveDB 时：
- *   1. 更新内存 + localStorage（运行时持久化）
- *   2. 尝试通过 File System Access API 写回 data.txt（需用户授权，仅限安全上下文/HTTPS或localhost）
- *   3. 若不支持，则提示用户手动导出
- */
-(function() {
-  const DATA_FILE = 'data.txt';               // 独立数据文件
-  const STORAGE_KEY = 'logistics_data_v4';    // 运行时缓存键（localStorage）
-  const AUTH_KEY = 'logistics_auth_v1';
-
-  let memoryDB = null;   // 内存中的数据库对象
-  let fileHandle = null; // File System Access API 文件句柄
-
-  /* ---- 内置默认数据（仅当 data.txt 加载失败时兜底） ---- */
-  function buildDefaultData() {
-    return {
-      settings: {
-        announcement: '⚠️ 数据文件 data.txt 未找到，当前显示默认数据。请确保 data.txt 与 index.html 在同一目录。',
-        phone: '400-888-8888',
-        wechat: 'kuaixian888',
-        address: '广东省深圳市宝安区国际物流园A栋'
-      },
-      countries: [
-        { id: 'c1', name: '美国' },
-        { id: 'c2', name: '英国' },
-        { id: 'c3', name: '日本' }
-      ],
-      lines: [
-        {
-          id: 'l1', name: 'US-FedEx 特快', icon: '', enabled: 1, website: 'www.fedex.com', sender: '深圳', carrier: 'FedEx',
-          forbiddenServices: ['极简包装'], features: '时效快，可跟踪。', prohibited: '易燃易爆品。'
-        },
-        {
-          id: 'l2', name: 'UK-EMS 经济小包', icon: '', enabled: 1, website: 'www.ems.com', sender: '义乌', carrier: 'EMS',
-          forbiddenServices: [], features: '价格实惠。', prohibited: '违禁药品。'
-        }
-      ],
-      configs: [
-        {
-          id: 'cfg1', lineId: 'l1', countryId: 'c1', enabled: 1, deliveryCycle: '4-7天',
-          minWeight: 500, maxWeight: 30000, volDivisor: 5000, volRule: 1, priceType: 'first_add',
-          firstWeight: 500, firstPrice: 120, addWeight: 500, addPrice: 45,
-          serviceFee: 0, customsFee: 20, fuelRate: 15, operationFee: 10,
-          maxLength: 100, secondLength: 80, minGirth: 200, maxGirth: 300,
-          declareType: 'required', currency: 'USD', features: '', prohibited: ''
-        },
-        {
-          id: 'cfg2', lineId: 'l2', countryId: 'c2', enabled: 1, deliveryCycle: '7-15天',
-          minWeight: 1, maxWeight: 5000, volDivisor: 6000, volRule: 0, priceType: 'first_add',
-          firstWeight: 100, firstPrice: 25, addWeight: 100, addPrice: 8,
-          serviceFee: 5, customsFee: 0, fuelRate: 0, operationFee: 5,
-          maxLength: 60, secondLength: 50, minGirth: 120, maxGirth: 180,
-          declareType: 'forbidden', currency: 'GBP', features: '小包首选', prohibited: ''
-        }
-      ]
-    };
-  }
-
-  /* ---- 异步加载数据文件 ---- */
-  async function loadFromFile() {
-    try {
-      const resp = await fetch(DATA_FILE, { cache: 'no-store' });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const text = await resp.text();
-      if (!text)
-      {
-        var dataJson=buildDefaultData()
-        writeToDataFile(dataJson)
-        text=JSON.stringify(text)
-        console.log('数据初始化')
-      }
-      const data = JSON.parse(text);
-      if (!data || !data.lines || !data.countries || !data.configs) {
-        throw new Error('数据文件格式不正确');
-      }
-      return data;
-    } catch (err) {
-      console.warn('[DataService] 加载 data.txt 失败:', err.message);
-      return null;
-    }
-  }
-
-  /* ---- localStorage 读写 ---- */
-  function saveToStorage(data) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
-  }
-  function loadFromStorage() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        if (d && d.lines && d.countries && d.configs) return d;
-      }
-    } catch(e) {}
-    return null;
-  }
-
-  /* ---- 登录凭据管理 ---- */
-  function getAuth() {
-    let raw = localStorage.getItem(AUTH_KEY);
-    if (raw) return JSON.parse(raw);
-    let def = { username: 'admin', password: '123456' };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(def));
-    return def;
-  }
-  function saveAuth(auth) {
-    localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
-  }
-
-  /* ---- 文件写入：File System Access API ---- */
-  const isFileSystemAccessSupported = typeof window.showSaveFilePicker === 'function';
-
-  async function writeToDataFile(data) {
-    if (!isFileSystemAccessSupported) {
-      return { ok: false, reason: 'unsupported' };
-    }
-
-    try {
-      // 若已有文件句柄，先尝试复用（需要用户此前授权过）
-      if (fileHandle) {
-        try {
-          const writable = await fileHandle.createWritable();
-          await writable.write(JSON.stringify(data, null, 2));
-          await writable.close();
-          return { ok: true, mode: 'reuse' };
-        } catch (e) {
-          // 句柄失效，重新选择
-          fileHandle = null;
-        }
-      }
-
-      // 弹出文件保存选择器，让用户选择/创建 data.txt
-      const handle = await window.showSaveFilePicker({
-        suggestedName: DATA_FILE,
-        types: [{ description: '数据文件', accept: { 'text/plain': ['.txt'] } }]
-      });
-      fileHandle = handle;
-
-      const writable = await handle.createWritable();
-      await writable.write(JSON.stringify(data, null, 2));
-      await writable.close();
-      return { ok: true, mode: 'new' };
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        return { ok: false, reason: 'cancelled' };
-      }
-      console.error('[DataService] 写入 data.txt 失败:', err);
-      return { ok: false, reason: err.message };
-    }
-  }
-
-  /* ---- 状态回调（供 UI 更新提示） ---- */
-  let onFileStatusChange = null;
-  function setFileStatusCallback(cb) {
-    onFileStatusChange = cb;
-  }
-  function notifyFileStatus(status, extra) {
-    if (typeof onFileStatusChange === 'function') {
-      onFileStatusChange(status, extra);
-    }
-  }
-
-  /* ---- 对外暴露接口 ---- */
-  window.DataService = {
-    /**
-     * 异步初始化：优先从 data.txt 加载；失败则尝试 localStorage；再失败用内置默认数据。
-     */
-    async init() {
-      let fromFile = await loadFromFile();
-      if (fromFile) {
-        memoryDB = fromFile;
-        saveToStorage(memoryDB);
-        notifyFileStatus('loaded');
-        return memoryDB;
-      }
-      let fromStorage = loadFromStorage();
-      if (fromStorage) {
-        memoryDB = fromStorage;
-        notifyFileStatus('fallback');
-        return memoryDB;
-      }
-      memoryDB = buildDefaultData();
-      saveToStorage(memoryDB);
-      notifyFileStatus('default');
-      return memoryDB;
-    },
-
-    /** 获取当前内存中的 DB */
-    getDB() {
-      return memoryDB;
-    },
-
-    /**
-     * 保存 DB：更新内存 + localStorage，并尝试写回 data.txt
-     * 返回一个 Promise，解析为 { storage: true, file: { ok, reason } }
-     */
-    async saveDB(db) {
-      memoryDB = db;
-      saveToStorage(db);
-
-      // 异步写回 data.txt
-      const fileResult = await writeToDataFile(db);
-      notifyFileStatus(fileResult.ok ? 'saved' : (fileResult.reason || 'failed'), fileResult);
-      return { storage: true, file: fileResult };
-    },
-
-    /** 将当前数据导出为 data.txt 格式的 JSON 字符串 */
-    exportToFileString() {
-      return JSON.stringify(memoryDB, null, 2);
-    },
-
-    /** 获取登录凭据 */
-    getAuth: getAuth,
-    /** 保存登录凭据 */
-    saveAuth: saveAuth,
-
-    /** 强制重置为默认数据（调试用） */
-    resetDefault() {
-      memoryDB = buildDefaultData();
-      saveToStorage(memoryDB);
-      return memoryDB;
-    },
-
-    /** 设置文件状态回调 */
-    setFileStatusCallback: setFileStatusCallback,
-
-    /** 是否支持 File System Access API */
-    isFileSystemAccessSupported,
-
-    /** 重置文件句柄（重新加载后需要重新选择文件） */
-    resetFileHandle() {
-      fileHandle = null;
-    }
-  };
-})();
-</script>
+<!-- 云端同步状态提示 -->
+<div class="cloud-status" id="cloudStatus"></div>
 
 <script>
 /* =========================================================
-   主逻辑
+   0. 云端存储配置（第三方免费云数据库：JsonLight）
+   ---------------------------------------------------------
+   使用前请前往 https://json.lighttools.net 生成一个存储 Key，
+   并替换下面的 CLOUD_STORAGE_KEY。
+   ========================================================= */
+const CLOUD_STORAGE_KEY = '844e53c089c88381'; // ← 改这里
+const CLOUD_API_BASE = `https://json.lighttools.net/json/${CLOUD_STORAGE_KEY}`;
+
+const STORAGE_KEY = 'logistics_data_v4'; // 本地缓存 key（离线降级用）
+const AUTH_KEY = 'logistics_auth_v1';
+
+/* =========================================================
+   1. 登录凭证（本地存储）
+   ---------------------------------------------------------
+   注意：纯前端应用无法真正保密密码。此处仅作简单拦截，
+   不要用于存放高价值敏感信息。
+   ========================================================= */
+function getAuth() {
+  let raw = localStorage.getItem(AUTH_KEY);
+  if (raw) return JSON.parse(raw);
+  let def = { username: 'admin', password: '123456' };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(def));
+  return def;
+}
+let AUTH = getAuth();
+
+/* =========================================================
+   2. 默认数据结构
+   ========================================================= */
+function buildDefaultData() {
+  return {
+    settings: {
+      announcement: '系统已升级至全新版本，线路计费规则更加精准！',
+      phone: '400-888-8888',
+      wechat: 'kuaixian888',
+      address: '广东省深圳市宝安区国际物流园A栋'
+    },
+    countries: [
+      { id: 'c1', name: '美国' },
+      { id: 'c2', name: '英国' },
+      { id: 'c3', name: '日本' }
+    ],
+    lines: [
+      { 
+        id: 'l1', name: 'US-FedEx 特快', icon: '', enabled: 1, website: 'www.fedex.com', sender: '深圳', carrier: 'FedEx', 
+        forbiddenServices: ['极简包装'], features: '时效快，可跟踪。', prohibited: '易燃易爆品。' 
+      },
+      { 
+        id: 'l2', name: 'UK-EMS 经济小包', icon: '', enabled: 1, website: 'www.ems.com', sender: '义乌', carrier: 'EMS', 
+        forbiddenServices: [], features: '价格实惠。', prohibited: '违禁药品。' 
+      }
+    ],
+    configs: [
+      { 
+        id: 'cfg1', lineId: 'l1', countryId: 'c1', enabled: 1, deliveryCycle: '4-7天', 
+        minWeight: 500, maxWeight: 30000, volDivisor: 5000, volRule: 1, priceType: 'first_add',
+        firstWeight: 500, firstPrice: 120, addWeight: 500, addPrice: 45,
+        serviceFee: 0, customsFee: 20, fuelRate: 15, operationFee: 10,
+        maxLength: 100, secondLength: 80, minGirth: 200, maxGirth: 300,
+        declareType: 'required', currency: 'USD', features: '', prohibited: ''
+      },
+      { 
+        id: 'cfg2', lineId: 'l2', countryId: 'c2', enabled: 1, deliveryCycle: '7-15天', 
+        minWeight: 1, maxWeight: 5000, volDivisor: 6000, volRule: 0, priceType: 'first_add',
+        firstWeight: 100, firstPrice: 25, addWeight: 100, addPrice: 8,
+        serviceFee: 5, customsFee: 0, fuelRate: 0, operationFee: 5,
+        maxLength: 60, secondLength: 50, minGirth: 120, maxGirth: 180,
+        declareType: 'forbidden', currency: 'GBP', features: '小包首选', prohibited: ''
+      }
+    ]
+  };
+}
+
+/* =========================================================
+   3. 通用工具
    ========================================================= */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -945,509 +758,113 @@ const esc = s => String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','
 function closeModal(id) { $('#' + id).classList.remove('show'); }
 function openModal(id) { $('#' + id).classList.add('show'); }
 
-let DB = null;
-let AUTH = null;
-
-/* ---- 文件状态提示更新 ---- */
-function updateFileStatus(status, extra) {
-  const el = $('#dataFileStatus');
-  if (!el) return;
-  const map = {
-    loaded:   { cls: 'ok',   text: '✅ 数据已加载', title: '从 data.txt 加载成功' },
-    saved:    { cls: 'ok',   text: '💾 已保存到 data.txt', title: '数据已写回文件' },
-    fallback: { cls: 'warn', text: '⚠️ 使用缓存数据', title: 'data.txt 加载失败，使用 localStorage 缓存' },
-    default:  { cls: 'warn', text: '⚠️ 使用默认数据', title: 'data.txt 加载失败，使用内置默认数据' },
-    failed:   { cls: 'warn', text: '⚠️ 文件写入失败', title: extra?.reason || '请手动导出 data.txt' },
-    unsupported: { cls: 'off', text: '📄 仅本地缓存', title: '浏览器不支持文件写入，请手动导出 data.txt' },
-    cancelled: { cls: 'off', text: '⏸️ 写入已取消', title: '您取消了文件保存' },
-  };
-  const info = map[status] || { cls: 'off', text: '⏳ 检测中', title: '' };
-  el.className = 'data-file-status ' + info.cls;
-  el.textContent = info.text;
-  el.title = info.title;
-}
-
-/* ---- 持久化封装：异步保存 ---- */
-async function persistDB() {
-  const result = await window.DataService.saveDB(DB);
-  return result;
+let cloudStatusTimer = null;
+function showCloudStatus(text, isError) {
+  const el = $('#cloudStatus');
+  el.textContent = text;
+  el.style.color = isError ? 'var(--danger)' : 'var(--text-2)';
+  el.classList.add('show');
+  clearTimeout(cloudStatusTimer);
+  cloudStatusTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
 /* =========================================================
-   启动
+   4. 数据读写（云端 + 本地降级）
    ========================================================= */
-async function bootstrap() {
-  const loadingEl = $('#loadingOverlay');
+function saveDataLocalOnly(d) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch(e) {}
+}
 
-  // 注册文件状态回调
-  window.DataService.setFileStatusCallback(updateFileStatus);
+// 异步保存到云端；失败时降级到本地
+async function saveData(d) {
+  saveDataLocalOnly(d); // 始终先写本地，保证不丢
+  try {
+    const resp = await fetch(CLOUD_API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(d)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    showCloudStatus('☁️ 已同步到云端');
+  } catch (e) {
+    console.error('云端保存失败，已暂存本地:', e);
+    showCloudStatus('⚠️ 云端同步失败，已暂存本地', true);
+  }
+}
 
-  DB = await window.DataService.init();
-  AUTH = window.DataService.getAuth();
-
-  loadingEl.classList.add('hide');
-
-  // 更新文件支持提示
-  const hint = $('#fileSupportHint');
-  if (hint) {
-    if (window.DataService.isFileSystemAccessSupported) {
-      hint.innerHTML = '<span style="color:var(--success)">✅ 浏览器支持自动写回 data.txt。保存时将弹出文件选择器，请选择 data.txt 即可覆盖更新。</span>';
-    } else {
-      hint.innerHTML = '<span style="color:var(--danger)">⚠️ 当前浏览器不支持自动写回文件。修改后请点击「导出 data.txt」手动保存。</span>';
+// 异步从云端加载；失败时回退到本地缓存 / 默认数据
+async function loadData() {
+  try {
+    const resp = await fetch(CLOUD_API_BASE);
+    if (resp.ok) {
+      const d = await resp.json();
+      // 空对象或结构不完整视为无数据
+      if (d && typeof d === 'object' && d.lines && d.countries && d.configs) {
+        saveDataLocalOnly(d);
+        return d;
+      }
     }
+  } catch (e) {
+    console.warn('云端读取失败，尝试本地缓存', e);
   }
 
-  initThemeAndNav();
-  initEventListeners();
-  initFrontend();
+  // 本地缓存
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d && d.lines && d.countries && d.configs) return d;
+    }
+  } catch(e) {}
+
+  // 默认数据
+  return buildDefaultData();
 }
 
 /* =========================================================
-   主题与导航
+   5. 主题切换
    ========================================================= */
-function initThemeAndNav() {
-  const themeToggleBtn = $('#themeToggle');
-  const currentTheme = localStorage.getItem('theme') || 'light';
-  document.documentElement.setAttribute('data-theme', currentTheme);
-  if (currentTheme === 'dark') themeToggleBtn.textContent = '☀️';
+const themeToggleBtn = $('#themeToggle');
+const currentTheme = localStorage.getItem('theme') || 'light';
+document.documentElement.setAttribute('data-theme', currentTheme);
+if (currentTheme === 'dark') themeToggleBtn.textContent = '☀️';
 
-  themeToggleBtn.addEventListener('click', () => {
-    const now = document.documentElement.getAttribute('data-theme');
-    const next = now === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    themeToggleBtn.textContent = next === 'dark' ? '☀️' : '🌙';
-  });
-
-  $$('.tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetView = btn.dataset.view;
-      if (targetView === 'admin' && sessionStorage.getItem('logged_in') !== 'true') {
-        $('#loginUser').value = ''; $('#loginPass').value = ''; $('#loginError').textContent = '';
-        openModal('loginMask');
-        return;
-      }
-      $$('.tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      $$('.view').forEach(v => v.classList.remove('active'));
-      $('#view-' + targetView).classList.add('active');
-      
-      if (targetView === 'query') { initFrontend(); }
-      else { initAdmin(); }
-    });
-  });
-}
+themeToggleBtn.addEventListener('click', () => {
+  const now = document.documentElement.getAttribute('data-theme');
+  const next = now === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  themeToggleBtn.textContent = next === 'dark' ? '☀️' : '🌙';
+});
 
 /* =========================================================
-   事件绑定
+   6. 导航切换
    ========================================================= */
-function initEventListeners() {
-  /* ---- 后台菜单切换 ---- */
-  $$('.menu-item').forEach(item => {
-    item.addEventListener('click', () => {
-      $$('.menu-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
-      $$('.admin-panel').forEach(p => p.classList.remove('active'));
-      $('#' + item.dataset.target).classList.add('active');
-    });
-  });
-
-  /* ---- 数据文件操作 ---- */
-  $('#btnExportData').addEventListener('click', () => {
-    const content = window.DataService.exportToFileString();
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'data.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  });
-
-  $('#btnReloadData').addEventListener('click', async () => {
-    if (!confirm('重新加载 data.txt 将丢弃未保存的修改，确定继续吗？')) return;
-    window.DataService.resetFileHandle();
-    const loadingEl = $('#loadingOverlay');
-    loadingEl.classList.remove('hide');
-    loadingEl.textContent = '正在重新加载 data.txt ...';
-    DB = await window.DataService.init();
-    loadingEl.classList.add('hide');
-    initAdmin();
-    initFrontend();
-  });
-
-  /* ================= 国际线路 ================= */
-  $('#btnAddLine').addEventListener('click', () => {
-    editingLineId = null;
-    currentIconBase64 = '';
-    $('#lineModalTitle').textContent = '新增国际线路';
-    $('#lineIconPreview').innerHTML = '+<br><span style="font-size:12px">上传</span>';
-    $('#lineWebsite').value = ''; $('#lineSender').value = ''; $('#lineCarrier').value = '';
-    $('#lineName').value = ''; $('#lineFeatures').value = ''; $('#lineProhibited').value = '';
-    $('input[name="lineEnabled"][value="1"]').checked = true;
-    $('#lineForbiddenService').checked = false;
-    openModal('lineModal');
-  });
-
-  $('#btnSaveLine').addEventListener('click', async () => {
-    let name = $('#lineName').value.trim();
-    if (!name) { alert('请填写线路名称'); return; }
-    
-    let forbiddenServices = [];
-    if ($('#lineForbiddenService').checked) forbiddenServices.push('极简包装');
-
-    let payload = {
-      name: name, icon: currentIconBase64, enabled: Number($('input[name="lineEnabled"]:checked').value),
-      website: $('#lineWebsite').value.trim(), sender: $('#lineSender').value, carrier: $('#lineCarrier').value,
-      forbiddenServices: forbiddenServices, features: $('#lineFeatures').value.trim(), prohibited: $('#lineProhibited').value.trim()
-    };
-
-    if (editingLineId) {
-      let idx = DB.lines.findIndex(x => x.id === editingLineId);
-      DB.lines[idx] = Object.assign({}, DB.lines[idx], payload);
-    } else {
-      DB.lines.push(Object.assign({ id: uid('l') }, payload));
+$$('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetView = btn.dataset.view;
+    if (targetView === 'admin' && sessionStorage.getItem('logged_in') !== 'true') {
+      $('#loginUser').value = ''; $('#loginPass').value = ''; $('#loginError').textContent = '';
+      openModal('loginMask');
+      return;
     }
-    await persistDB();
-    closeModal('lineModal'); renderAdminLines();
-  });
-
-  window.delLine = async function(id) {
-    if (confirm('删除线路会同时删除相关的线路配置，确定吗？')) {
-      DB.lines = DB.lines.filter(x => x.id !== id);
-      DB.configs = DB.configs.filter(x => x.lineId !== id);
-      await persistDB();
-      renderAdminLines(); renderAdminConfigs();
-    }
-  };
-
-  /* ================= 线路配置 ================= */
-  $('#btnAddConfig').addEventListener('click', () => {
-    if (DB.lines.length === 0 || DB.countries.length === 0) { alert('请先添加国际线路和国家'); return; }
-    editingConfigId = null;
-    $('#configModalTitle').textContent = '新增线路配置';
-    $('#cfgLineId').innerHTML = DB.lines.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
-    $('#cfgCountryId').innerHTML = DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-    
-    $('#cfgDeliveryCycle').value = '';
-    $('#cfgMinWeight').value = 1; $('#cfgMaxWeight').value = 30000; $('#cfgVolDivisor').value = 6000;
-    $('#cfgVolRule').value = '0'; $('input[name="cfgPriceType"][value="first_add"]').checked = true;
-    $('#cfgFirstWeight').value = 500; $('#cfgFirstPrice').value = 0;
-    $('#cfgAddWeight').value = 500; $('#cfgAddPrice').value = 0;
-    $('#cfgServiceFee').value = 0; $('#cfgCustomsFee').value = 0; $('#cfgFuelRate').value = 0; $('#cfgOperationFee').value = 0;
-    $('#cfgMaxLength').value = 100; $('#cfgSecondLength').value = 80; $('#cfgMinGirth').value = 200; $('#cfgMaxGirth').value = 300;
-    $('input[name="cfgDeclareType"][value="forbidden"]').checked = true; $('#cfgCurrency').value = 'USD';
-    $('#cfgFeatures').value = ''; $('#cfgProhibited').value = '';
-    $('input[name="cfgEnabled"][value="1"]').checked = true;
-    
-    openModal('configModal');
-  });
-
-  $('#btnSaveConfig').addEventListener('click', async () => {
-    let payload = {
-      lineId: $('#cfgLineId').value, countryId: $('#cfgCountryId').value,
-      enabled: Number($('input[name="cfgEnabled"]:checked').value),
-      deliveryCycle: $('#cfgDeliveryCycle').value.trim(),
-      minWeight: num($('#cfgMinWeight').value, 1), maxWeight: num($('#cfgMaxWeight').value, 30000),
-      volDivisor: num($('#cfgVolDivisor').value, 6000), volRule: Number($('#cfgVolRule').value),
-      priceType: $('input[name="cfgPriceType"]:checked').value,
-      firstWeight: num($('#cfgFirstWeight').value, 500), firstPrice: num($('#cfgFirstPrice').value, 0),
-      addWeight: num($('#cfgAddWeight').value, 500), addPrice: num($('#cfgAddPrice').value, 0),
-      serviceFee: num($('#cfgServiceFee').value, 0), customsFee: num($('#cfgCustomsFee').value, 0),
-      fuelRate: num($('#cfgFuelRate').value, 0), operationFee: num($('#cfgOperationFee').value, 0),
-      maxLength: num($('#cfgMaxLength').value, 0), secondLength: num($('#cfgSecondLength').value, 0),
-      minGirth: num($('#cfgMinGirth').value, 0), maxGirth: num($('#cfgMaxGirth').value, 0),
-      declareType: $('input[name="cfgDeclareType"]:checked').value, currency: $('#cfgCurrency').value,
-      features: $('#cfgFeatures').value.trim(), prohibited: $('#cfgProhibited').value.trim()
-    };
-
-    if (editingConfigId) {
-      let idx = DB.configs.findIndex(x => x.id === editingConfigId);
-      DB.configs[idx] = Object.assign({}, DB.configs[idx], payload);
-    } else {
-      DB.configs.push(Object.assign({ id: uid('cfg') }, payload));
-    }
-    await persistDB();
-    closeModal('configModal'); renderAdminConfigs();
-  });
-
-  window.delConfig = async function(id) {
-    if (confirm('确定删除该线路配置吗？')) {
-      DB.configs = DB.configs.filter(x => x.id !== id);
-      await persistDB();
-      renderAdminConfigs();
-    }
-  };
-
-  /* ================= 国家 ================= */
-  $('#btnAddCountry').addEventListener('click', async () => {
-    let str = $('#batchCountryInput').value;
-    if (!str.trim()) return;
-    
-    let names = str.split(/[,，\s、]+/).map(n => n.trim()).filter(Boolean);
-    let addedCount = 0;
-    let duplicateCount = 0;
-
-    names.forEach(name => {
-      if (!DB.countries.find(c => c.name === name)) {
-        DB.countries.push({ id: uid('c'), name: name });
-        addedCount++;
-      } else {
-        duplicateCount++;
-      }
-    });
-
-    if (addedCount > 0) {
-      await persistDB();
-      renderAdminCountries(); 
-      $('#filterCfgCountry').innerHTML = '<option value="">全部国家</option>' + DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-      $('#batchCountryInput').value = '';
-    }
-    
-    alert(`成功添加 ${addedCount} 个国家${duplicateCount>0 ? `，${duplicateCount} 个已存在被忽略` : ''}`);
-  });
-
-  window.delCountry = async function(id) {
-    if (confirm('删除国家会同时删除相关的线路配置，确定吗？')) {
-      DB.countries = DB.countries.filter(x => x.id !== id);
-      DB.configs = DB.configs.filter(x => x.countryId !== id);
-      await persistDB();
-      renderAdminCountries(); renderAdminConfigs();
-    }
-  };
-
-  /* ================= 公告 & 联系方式 ================= */
-  $('#btnSaveNotice').addEventListener('click', async () => {
-    DB.settings.announcement = $('#cfgNotice').value.trim();
-    await persistDB();
-    alert('公告已保存');
-  });
-
-  $('#btnSaveContact').addEventListener('click', async () => {
-    DB.settings.phone = $('#cfgPhone').value.trim();
-    DB.settings.wechat = $('#cfgWechat').value.trim();
-    DB.settings.address = $('#cfgAddress').value.trim();
-    await persistDB();
-    alert('联系方式已保存');
-  });
-
-  /* ================= 登录/密码 ================= */
-  $('#loginSubmit').addEventListener('click', () => {
-    if ($('#loginUser').value.trim() === AUTH.username && $('#loginPass').value === AUTH.password) {
-      sessionStorage.setItem('logged_in', 'true');
-      closeModal('loginMask');
-      $$('.tab').forEach(b => b.classList.remove('active'));
-      $('.tab[data-view="admin"]').classList.add('active');
-      $$('.view').forEach(v => v.classList.remove('active'));
-      $('#view-admin').classList.add('active');
-      initAdmin();
-    } else {
-      $('#loginError').textContent = '账号或密码错误';
-    }
-  });
-  $('#loginClose').addEventListener('click', () => closeModal('loginMask'));
-  $('#loginCancel').addEventListener('click', () => closeModal('loginMask'));
-  $('#btnLogout').addEventListener('click', () => {
-    sessionStorage.removeItem('logged_in');
     $$('.tab').forEach(b => b.classList.remove('active'));
-    $('.tab[data-view="query"]').classList.add('active');
+    btn.classList.add('active');
     $$('.view').forEach(v => v.classList.remove('active'));
-    $('#view-query').classList.add('active');
-    initFrontend();
-  });
-
-  $('#btnChangePassModal').addEventListener('click', () => {
-    $('#oldPass').value = ''; $('#newPass').value = ''; $('#newPass2').value = '';
-    openModal('passMask');
-  });
-  $('#passClose').addEventListener('click', () => closeModal('passMask'));
-  $('#passCancel').addEventListener('click', () => closeModal('passMask'));
-  $('#btnChangePass').addEventListener('click', () => {
-    if ($('#oldPass').value !== AUTH.password) { alert('原密码错误'); return; }
-    if (!$('#newPass').value) { alert('新密码不能为空'); return; }
-    if ($('#newPass').value !== $('#newPass2').value) { alert('两次密码不一致'); return; }
-    AUTH.password = $('#newPass').value;
-    window.DataService.saveAuth(AUTH);
-    closeModal('passMask'); alert('密码修改成功');
-  });
-
-  /* ================= 前台：模式切换 / 鞋子行 ================= */
-  let currentMode = 'shoe';
-  $$('.method-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      $$('.method-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentMode = btn.dataset.mode;
-      $('#modeShoe').style.display = currentMode === 'shoe' ? 'block' : 'none';
-      $('#modeWeight').style.display = currentMode === 'weight' ? 'block' : 'none';
-    });
-  });
-
-  $('#addShoeBtn').addEventListener('click', () => {
-    let div = document.createElement('div');
-    div.className = 'shoe-row';
-    div.innerHTML = `
-      <input type="text" placeholder="型号" class="shoe-model">
-      <input type="number" placeholder="尺码" class="shoe-size">
-      <input type="number" placeholder="双数" value="1" class="shoe-qty">
-      <button class="remove-shoe" onclick="this.parentNode.remove()">×</button>
-    `;
-    $('#shoeList').appendChild(div);
-  });
-
-  window.fillShoe = function(name) {
-    let rows = $$('#shoeList .shoe-row');
-    let target = Array.from(rows).reverse().find(r => !r.querySelector('.shoe-model').value);
-    if (!target) { $('#addShoeBtn').click(); target = $$('#shoeList .shoe-row').pop(); }
-    target.querySelector('.shoe-model').value = name;
-    target.querySelector('.shoe-size').focus();
-  };
-
-  /* ================= 前台：估算 ================= */
-  $('#btnEstimate').addEventListener('click', () => {
-    let countryId = $('#estDestSelect').value;
-    if (!countryId) { alert('请选择目的地国家'); return; }
-
-    let actualWeightGrams = 0;
-    let totalVolGrams = 0;
-    let detailStr = '';
-
-    if (currentMode === 'shoe') {
-      let pairs = 0;
-      $$('#shoeList .shoe-row').forEach(r => { pairs += num(r.querySelector('.shoe-qty').value, 0); });
-      if (pairs <= 0) { alert('请填写鞋子数量'); return; }
-      actualWeightGrams = pairs * 1200;
-      totalVolGrams = pairs * (35 * 25 * 15 / 5000) * 1000; 
-      detailStr = `共 ${pairs} 双，按实重估算约 ${(actualWeightGrams/1000).toFixed(1)}kg`;
-    } else {
-      let actualKg = num($('#estActualWeight').value, 0);
-      if (actualKg <= 0) { alert('请填写实重'); return; }
-      actualWeightGrams = actualKg * 1000;
-      let l = num($('#estLength').value, 0), w = num($('#estWidth').value, 0), h = num($('#estHeight').value, 0);
-      if (l>0 && w>0 && h>0) {
-        totalVolGrams = (l * w * h / 5000) * 1000;
-      }
-      detailStr = `实重 ${actualKg}kg`;
-    }
-
-    let validConfigs = DB.configs.filter(c => c.countryId === countryId && c.enabled == 1);
+    $('#view-' + targetView).classList.add('active');
     
-    if (validConfigs.length === 0) {
-      $('#emptyResultTip').style.display = 'none';
-      $('#estimateResultsList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">该国家暂无可用线路配置</div>';
-      return;
-    }
-
-    let results = [];
-
-    validConfigs.forEach(cfg => {
-      let line = DB.lines.find(l => l.id === cfg.lineId);
-      if (!line || line.enabled != 1) return;
-
-      let calcWeightGrams = actualWeightGrams;
-      let volText = '';
-      
-      let currentVolGrams = 0;
-      if (currentMode === 'weight') {
-        let l = num($('#estLength').value, 0), w = num($('#estWidth').value, 0), h = num($('#estHeight').value, 0);
-        if (l>0 && w>0 && h>0) {
-          currentVolGrams = (l * w * h / cfg.volDivisor) * 1000;
-        }
-      } else if (currentMode === 'shoe') {
-        currentVolGrams = (35 * 25 * 15 / cfg.volDivisor) * 1000 * (actualWeightGrams / 1200);
-      }
-
-      if (cfg.volRule == 1) {
-        if (currentVolGrams > actualWeightGrams) {
-          calcWeightGrams = currentVolGrams;
-          volText = ` (材积重 ${(currentVolGrams/1000).toFixed(2)}kg)`;
-        }
-      } else {
-        calcWeightGrams = actualWeightGrams;
-      }
-
-      if (calcWeightGrams < cfg.minWeight) calcWeightGrams = cfg.minWeight;
-      if (calcWeightGrams > cfg.maxWeight) return;
-
-      let basePrice = 0;
-      if (calcWeightGrams <= cfg.firstWeight) {
-        basePrice = cfg.firstPrice;
-      } else {
-        let extra = Math.ceil((calcWeightGrams - cfg.firstWeight) / cfg.addWeight);
-        basePrice = cfg.firstPrice + extra * cfg.addPrice;
-      }
-
-      let fuelCost = basePrice * (cfg.fuelRate / 100);
-      let serviceCost = basePrice * (cfg.serviceFee / 100);
-      let totalPrice = basePrice + fuelCost + serviceCost + cfg.customsFee + cfg.operationFee;
-
-      results.push({
-        line: line, cfg: cfg, price: totalPrice, calcWeight: calcWeightGrams, volText: volText
-      });
-    });
-
-    if (results.length === 0) {
-      $('#emptyResultTip').style.display = 'none';
-      $('#estimateResultsList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">包裹重量或尺寸超出该国家所有线路的限制</div>';
-      return;
-    }
-
-    results.sort((a,b) => a.price - b.price);
-
-    $('#emptyResultTip').style.display = 'none';
-    $('#estimateResultsList').innerHTML = results.map(r => `
-      <div class="route-card">
-        <div class="card-top">
-          <div style="display:flex; align-items:center; gap:10px;">
-            ${r.line.icon ? `<img src="${r.line.icon}" style="width:40px;height:40px;border-radius:8px;border:1px solid var(--border);">` : `<div style="width:40px;height:40px;background:var(--primary-light);color:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;">${r.line.name.charAt(0)}</div>`}
-            <div>
-              <div class="carrier-name">${esc(r.line.name)} <span class="tag">${esc(r.line.carrier)}</span></div>
-              <div style="font-size:12px;color:var(--text-3);margin-top:4px;">${esc(r.cfg.deliveryCycle)} · 由 ${esc(r.line.sender)} 发出</div>
-            </div>
-          </div>
-          <div class="price">
-            <span class="amount">¥${r.price.toFixed(2)}</span>
-            <span style="font-size:12px;color:var(--text-3)">预估总价</span>
-          </div>
-        </div>
-        
-        <div class="card-info">
-          <span>⚖️ 计费重: ${(r.calcWeight/1000).toFixed(2)}kg ${r.volText}</span>
-          <span>⏱ ${r.cfg.deliveryCycle}</span>
-          <span>📦 首重${r.cfg.firstWeight}g/¥${r.cfg.firstPrice} + 续重${r.cfg.addWeight}g/¥${r.cfg.addPrice}</span>
-        </div>
-
-        ${r.line.forbiddenServices && r.line.forbiddenServices.length ? `
-          <div style="font-size:12px;color:var(--danger);margin-bottom:12px;">
-            <strong>不支持服务：</strong> ${r.line.forbiddenServices.join(', ')}
-          </div>
-        ` : ''}
-
-        <div class="card-rule">
-          <div style="margin-bottom:4px;"><strong>线路特点：</strong> ${esc(r.cfg.features || r.line.features || '无')}</div>
-          <div><strong>禁寄物品：</strong> ${esc(r.cfg.prohibited || r.line.prohibited || '无')}</div>
-          ${r.cfg.customsFee > 0 || r.cfg.fuelRate > 0 || r.cfg.operationFee > 0 ? `
-            <div style="margin-top:8px; border-top:1px dashed var(--border); padding-top:8px; color:var(--text-2)">
-              费用明细：基础运费 ¥${(r.price - r.cfg.customsFee - r.cfg.operationFee).toFixed(2)} 
-              ${r.cfg.fuelRate>0 ? `| 燃油费(${r.cfg.fuelRate}%) ` : ''} 
-              ${r.cfg.customsFee>0 ? `| 报关费 ¥${r.cfg.customsFee} ` : ''} 
-              ${r.cfg.operationFee>0 ? `| 操作费 ¥${r.cfg.operationFee}` : ''}
-            </div>
-          ` : ''}
-        </div>
-      </div>
-    `).join('');
+    if (targetView === 'query') { initFrontend(); }
+    else { initAdmin(); }
   });
-}
+});
 
 /* =========================================================
-   后台渲染
+   7. 后台管理逻辑
    ========================================================= */
 function initAdmin() {
   $('#adminCurrentUser').value = AUTH.username;
   
+  // 初始化筛选下拉框
   $('#filterCfgCountry').innerHTML = '<option value="">全部国家</option>' + DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
   $('#filterCfgLine').innerHTML = '<option value="">全部线路</option>' + DB.lines.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
 
@@ -1461,6 +878,17 @@ function initAdmin() {
   $('#cfgAddress').value = DB.settings.address || '';
 }
 
+// 菜单切换
+$$('.menu-item').forEach(item => {
+  item.addEventListener('click', () => {
+    $$('.menu-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    $$('.admin-panel').forEach(p => p.classList.remove('active'));
+    $('#' + item.dataset.target).classList.add('active');
+  });
+});
+
+// --- 模块：国际线路 ---
 function renderAdminLines() {
   let keyword = $('#filterLineName').value.trim().toLowerCase();
   let status = $('#filterLineStatus').value;
@@ -1488,6 +916,80 @@ function renderAdminLines() {
   if(filtered.length === 0) $('#lineTbody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3)">没有符合条件的线路</td></tr>';
 }
 
+let editingLineId = null;
+let currentIconBase64 = '';
+
+window.previewIcon = function(input) {
+  if (input.files && input.files[0]) {
+    let reader = new FileReader();
+    reader.onload = function(e) {
+      currentIconBase64 = e.target.result;
+      $('#lineIconPreview').innerHTML = `<img src="${currentIconBase64}">`;
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+};
+
+$('#btnAddLine').addEventListener('click', () => {
+  editingLineId = null;
+  currentIconBase64 = '';
+  $('#lineModalTitle').textContent = '新增国际线路';
+  $('#lineIconPreview').innerHTML = '+<br><span style="font-size:12px">上传</span>';
+  $('#lineWebsite').value = ''; $('#lineSender').value = ''; $('#lineCarrier').value = '';
+  $('#lineName').value = ''; $('#lineFeatures').value = ''; $('#lineProhibited').value = '';
+  $('input[name="lineEnabled"][value="1"]').checked = true;
+  $('#lineForbiddenService').checked = false;
+  openModal('lineModal');
+});
+
+window.editLine = function(id) {
+  let l = DB.lines.find(x => x.id === id);
+  if (!l) return;
+  editingLineId = id;
+  currentIconBase64 = l.icon || '';
+  $('#lineModalTitle').textContent = '修改国际线路';
+  $('#lineIconPreview').innerHTML = l.icon ? `<img src="${l.icon}">` : '+<br><span style="font-size:12px">上传</span>';
+  $('#lineWebsite').value = l.website; $('#lineSender').value = l.sender; $('#lineCarrier').value = l.carrier;
+  $('#lineName').value = l.name; $('#lineFeatures').value = l.features; $('#lineProhibited').value = l.prohibited;
+  $(`input[name="lineEnabled"][value="${l.enabled}"]`).checked = true;
+  
+  // 仅处理极简包装
+  $('#lineForbiddenService').checked = (l.forbiddenServices || []).includes('极简包装');
+  openModal('lineModal');
+};
+
+$('#btnSaveLine').addEventListener('click', () => {
+  let name = $('#lineName').value.trim();
+  if (!name) { alert('请填写线路名称'); return; }
+  
+  let forbiddenServices = [];
+  if ($('#lineForbiddenService').checked) forbiddenServices.push('极简包装');
+
+  let payload = {
+    name: name, icon: currentIconBase64, enabled: Number($('input[name="lineEnabled"]:checked').value),
+    website: $('#lineWebsite').value.trim(), sender: $('#lineSender').value, carrier: $('#lineCarrier').value,
+    forbiddenServices: forbiddenServices, features: $('#lineFeatures').value.trim(), prohibited: $('#lineProhibited').value.trim()
+  };
+
+  if (editingLineId) {
+    let idx = DB.lines.findIndex(x => x.id === editingLineId);
+    DB.lines[idx] = Object.assign({}, DB.lines[idx], payload);
+  } else {
+    DB.lines.push(Object.assign({ id: uid('l') }, payload));
+  }
+  saveData(DB); closeModal('lineModal'); renderAdminLines();
+});
+
+window.delLine = function(id) {
+  if (confirm('删除线路会同时删除相关的线路配置，确定吗？')) {
+    DB.lines = DB.lines.filter(x => x.id !== id);
+    DB.configs = DB.configs.filter(x => x.lineId !== id);
+    saveData(DB); renderAdminLines(); renderAdminConfigs();
+  }
+};
+
+
+// --- 模块：线路配置 ---
 function renderAdminConfigs() {
   let fCountry = $('#filterCfgCountry').value;
   let fLine = $('#filterCfgLine').value;
@@ -1522,49 +1024,29 @@ function renderAdminConfigs() {
   if(filtered.length === 0) $('#configTbody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-3)">没有符合条件的配置</td></tr>';
 }
 
-function renderAdminCountries() {
-  $('#countryTbody').innerHTML = DB.countries.map(c => `
-    <tr>
-      <td style="font-weight:600">${esc(c.name)}</td>
-      <td>
-        <div class="op-btns">
-          <button class="link-btn danger" onclick="delCountry('${c.id}')">删除</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-}
-
-/* ---- 全局编辑变量 ---- */
-let editingLineId = null;
-let currentIconBase64 = '';
 let editingConfigId = null;
 
-window.previewIcon = function(input) {
-  if (input.files && input.files[0]) {
-    let reader = new FileReader();
-    reader.onload = function(e) {
-      currentIconBase64 = e.target.result;
-      $('#lineIconPreview').innerHTML = `<img src="${currentIconBase64}">`;
-    };
-    reader.readAsDataURL(input.files[0]);
-  }
-};
-
-window.editLine = function(id) {
-  let l = DB.lines.find(x => x.id === id);
-  if (!l) return;
-  editingLineId = id;
-  currentIconBase64 = l.icon || '';
-  $('#lineModalTitle').textContent = '修改国际线路';
-  $('#lineIconPreview').innerHTML = l.icon ? `<img src="${l.icon}">` : '+<br><span style="font-size:12px">上传</span>';
-  $('#lineWebsite').value = l.website; $('#lineSender').value = l.sender; $('#lineCarrier').value = l.carrier;
-  $('#lineName').value = l.name; $('#lineFeatures').value = l.features; $('#lineProhibited').value = l.prohibited;
-  $(`input[name="lineEnabled"][value="${l.enabled}"]`).checked = true;
+$('#btnAddConfig').addEventListener('click', () => {
+  if (DB.lines.length === 0 || DB.countries.length === 0) { alert('请先添加国际线路和国家'); return; }
+  editingConfigId = null;
+  $('#configModalTitle').textContent = '新增线路配置';
+  $('#cfgLineId').innerHTML = DB.lines.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  $('#cfgCountryId').innerHTML = DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
   
-  $('#lineForbiddenService').checked = (l.forbiddenServices || []).includes('极简包装');
-  openModal('lineModal');
-};
+  // 重置表单
+  $('#cfgDeliveryCycle').value = '';
+  $('#cfgMinWeight').value = 1; $('#cfgMaxWeight').value = 30000; $('#cfgVolDivisor').value = 6000;
+  $('#cfgVolRule').value = '0'; $('input[name="cfgPriceType"][value="first_add"]').checked = true;
+  $('#cfgFirstWeight').value = 500; $('#cfgFirstPrice').value = 0;
+  $('#cfgAddWeight').value = 500; $('#cfgAddPrice').value = 0;
+  $('#cfgServiceFee').value = 0; $('#cfgCustomsFee').value = 0; $('#cfgFuelRate').value = 0; $('#cfgOperationFee').value = 0;
+  $('#cfgMaxLength').value = 100; $('#cfgSecondLength').value = 80; $('#cfgMinGirth').value = 200; $('#cfgMaxGirth').value = 300;
+  $('input[name="cfgDeclareType"][value="forbidden"]').checked = true; $('#cfgCurrency').value = 'USD';
+  $('#cfgFeatures').value = ''; $('#cfgProhibited').value = '';
+  $('input[name="cfgEnabled"][value="1"]').checked = true;
+  
+  openModal('configModal');
+});
 
 window.editConfig = function(id) {
   let c = DB.configs.find(x => x.id === id);
@@ -1589,10 +1071,151 @@ window.editConfig = function(id) {
   openModal('configModal');
 };
 
+$('#btnSaveConfig').addEventListener('click', () => {
+  let payload = {
+    lineId: $('#cfgLineId').value, countryId: $('#cfgCountryId').value,
+    enabled: Number($('input[name="cfgEnabled"]:checked').value),
+    deliveryCycle: $('#cfgDeliveryCycle').value.trim(),
+    minWeight: num($('#cfgMinWeight').value, 1), maxWeight: num($('#cfgMaxWeight').value, 30000),
+    volDivisor: num($('#cfgVolDivisor').value, 6000), volRule: Number($('#cfgVolRule').value),
+    priceType: $('input[name="cfgPriceType"]:checked').value,
+    firstWeight: num($('#cfgFirstWeight').value, 500), firstPrice: num($('#cfgFirstPrice').value, 0),
+    addWeight: num($('#cfgAddWeight').value, 500), addPrice: num($('#cfgAddPrice').value, 0),
+    serviceFee: num($('#cfgServiceFee').value, 0), customsFee: num($('#cfgCustomsFee').value, 0),
+    fuelRate: num($('#cfgFuelRate').value, 0), operationFee: num($('#cfgOperationFee').value, 0),
+    maxLength: num($('#cfgMaxLength').value, 0), secondLength: num($('#cfgSecondLength').value, 0),
+    minGirth: num($('#cfgMinGirth').value, 0), maxGirth: num($('#cfgMaxGirth').value, 0),
+    declareType: $('input[name="cfgDeclareType"]:checked').value, currency: $('#cfgCurrency').value,
+    features: $('#cfgFeatures').value.trim(), prohibited: $('#cfgProhibited').value.trim()
+  };
+
+  if (editingConfigId) {
+    let idx = DB.configs.findIndex(x => x.id === editingConfigId);
+    DB.configs[idx] = Object.assign({}, DB.configs[idx], payload);
+  } else {
+    DB.configs.push(Object.assign({ id: uid('cfg') }, payload));
+  }
+  saveData(DB); closeModal('configModal'); renderAdminConfigs();
+});
+
+window.delConfig = function(id) {
+  if (confirm('确定删除该线路配置吗？')) {
+    DB.configs = DB.configs.filter(x => x.id !== id);
+    saveData(DB); renderAdminConfigs();
+  }
+};
+
+// --- 模块：国家配置 ---
+function renderAdminCountries() {
+  $('#countryTbody').innerHTML = DB.countries.map(c => `
+    <tr>
+      <td style="font-weight:600">${esc(c.name)}</td>
+      <td>
+        <div class="op-btns">
+          <button class="link-btn danger" onclick="delCountry('${c.id}')">删除</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// 批量添加国家逻辑
+$('#btnAddCountry').addEventListener('click', () => {
+  let str = $('#batchCountryInput').value;
+  if (!str.trim()) return;
+  
+  // 按逗号、空格、顿号分割
+  let names = str.split(/[,，\s、]+/).map(n => n.trim()).filter(Boolean);
+  let addedCount = 0;
+  let duplicateCount = 0;
+
+  names.forEach(name => {
+    if (!DB.countries.find(c => c.name === name)) {
+      DB.countries.push({ id: uid('c'), name: name });
+      addedCount++;
+    } else {
+      duplicateCount++;
+    }
+  });
+
+  if (addedCount > 0) {
+    saveData(DB); 
+    renderAdminCountries(); 
+    // 更新配置筛选框
+    $('#filterCfgCountry').innerHTML = '<option value="">全部国家</option>' + DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    $('#batchCountryInput').value = '';
+  }
+  
+  alert(`成功添加 ${addedCount} 个国家${duplicateCount>0 ? `，${duplicateCount} 个已存在被忽略` : ''}`);
+});
+
+window.delCountry = function(id) {
+  if (confirm('删除国家会同时删除相关的线路配置，确定吗？')) {
+    DB.countries = DB.countries.filter(x => x.id !== id);
+    DB.configs = DB.configs.filter(x => x.countryId !== id);
+    saveData(DB); renderAdminCountries(); renderAdminConfigs();
+  }
+};
+
+// --- 模块：公告与联系方式 ---
+$('#btnSaveNotice').addEventListener('click', () => {
+  DB.settings.announcement = $('#cfgNotice').value.trim();
+  saveData(DB); alert('公告已保存');
+});
+
+$('#btnSaveContact').addEventListener('click', () => {
+  DB.settings.phone = $('#cfgPhone').value.trim();
+  DB.settings.wechat = $('#cfgWechat').value.trim();
+  DB.settings.address = $('#cfgAddress').value.trim();
+  saveData(DB); alert('联系方式已保存');
+});
+
+// --- 模块：登录与密码 ---
+$('#loginSubmit').addEventListener('click', () => {
+  if ($('#loginUser').value.trim() === AUTH.username && $('#loginPass').value === AUTH.password) {
+    sessionStorage.setItem('logged_in', 'true');
+    closeModal('loginMask');
+    $$('.tab').forEach(b => b.classList.remove('active'));
+    $('.tab[data-view="admin"]').classList.add('active');
+    $$('.view').forEach(v => v.classList.remove('active'));
+    $('#view-admin').classList.add('active');
+    initAdmin();
+  } else {
+    $('#loginError').textContent = '账号或密码错误';
+  }
+});
+$('#loginClose').addEventListener('click', () => closeModal('loginMask'));
+$('#loginCancel').addEventListener('click', () => closeModal('loginMask'));
+$('#btnLogout').addEventListener('click', () => {
+  sessionStorage.removeItem('logged_in');
+  $$('.tab').forEach(b => b.classList.remove('active'));
+  $('.tab[data-view="query"]').classList.add('active');
+  $$('.view').forEach(v => v.classList.remove('active'));
+  $('#view-query').classList.add('active');
+  initFrontend();
+});
+
+$('#btnChangePassModal').addEventListener('click', () => {
+  $('#oldPass').value = ''; $('#newPass').value = ''; $('#newPass2').value = '';
+  openModal('passMask');
+});
+$('#passClose').addEventListener('click', () => closeModal('passMask'));
+$('#passCancel').addEventListener('click', () => closeModal('passMask'));
+$('#btnChangePass').addEventListener('click', () => {
+  if ($('#oldPass').value !== AUTH.password) { alert('原密码错误'); return; }
+  if (!$('#newPass').value) { alert('新密码不能为空'); return; }
+  if ($('#newPass').value !== $('#newPass2').value) { alert('两次密码不一致'); return; }
+  AUTH.password = $('#newPass').value;
+  localStorage.setItem(AUTH_KEY, JSON.stringify(AUTH));
+  closeModal('passMask'); alert('密码修改成功');
+});
+
+
 /* =========================================================
-   前台渲染
+   8. 前台查询与计算逻辑
    ========================================================= */
 function initFrontend() {
+  // 渲染公告
   if (DB.settings.announcement) {
     $('#noticeContent').textContent = DB.settings.announcement;
     $('#noticeContainer').classList.remove('hide');
@@ -1600,20 +1223,226 @@ function initFrontend() {
     $('#noticeContainer').classList.add('hide');
   }
   
+  // 渲染联系方式
   $('#footerContacts').innerHTML = `
     <div class="contact-item"><span style="font-size:20px;">📞</span> <span>客服电话：<strong>${esc(DB.settings.phone)}</strong></span></div>
     <div class="contact-item"><span style="font-size:20px;">💬</span> <span>微信客服：<strong>${esc(DB.settings.wechat)}</strong></span></div>
     <div class="contact-item"><span style="font-size:20px;">📍</span> <span>公司地址：${esc(DB.settings.address)}</span></div>
   `;
 
+  // 渲染国家下拉
   let sel = $('#estDestSelect');
   sel.innerHTML = '<option value="">请选择国家</option>' + DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
 }
 
+// 模式切换
+let currentMode = 'shoe';
+$$('.method-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.method-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    $('#modeShoe').style.display = currentMode === 'shoe' ? 'block' : 'none';
+    $('#modeWeight').style.display = currentMode === 'weight' ? 'block' : 'none';
+  });
+});
+
+$('#addShoeBtn').addEventListener('click', () => {
+  let div = document.createElement('div');
+  div.className = 'shoe-row';
+  div.innerHTML = `
+    <input type="text" placeholder="型号" class="shoe-model">
+    <input type="number" placeholder="尺码" class="shoe-size">
+    <input type="number" placeholder="双数" value="1" class="shoe-qty">
+    <button class="remove-shoe" onclick="this.parentNode.remove()">×</button>
+  `;
+  $('#shoeList').appendChild(div);
+});
+
+window.fillShoe = function(name) {
+  let rows = $$('#shoeList .shoe-row');
+  let target = Array.from(rows).reverse().find(r => !r.querySelector('.shoe-model').value);
+  if (!target) { $('#addShoeBtn').click(); target = $$('#shoeList .shoe-row').pop(); }
+  target.querySelector('.shoe-model').value = name;
+  target.querySelector('.shoe-size').focus();
+};
+
+// --- 核心：计算价格 ---
+$('#btnEstimate').addEventListener('click', () => {
+  let countryId = $('#estDestSelect').value;
+  if (!countryId) { alert('请选择目的地国家'); return; }
+
+  let actualWeightGrams = 0;
+  let totalVolGrams = 0;
+  let detailStr = '';
+
+  if (currentMode === 'shoe') {
+    let pairs = 0;
+    $$('#shoeList .shoe-row').forEach(r => { pairs += num(r.querySelector('.shoe-qty').value, 0); });
+    if (pairs <= 0) { alert('请填写鞋子数量'); return; }
+    // 估算：1双鞋 = 1.2kg，体积按 35*25*15 算
+    actualWeightGrams = pairs * 1200;
+    totalVolGrams = pairs * (35 * 25 * 15 / 5000) * 1000; 
+    detailStr = `共 ${pairs} 双，按实重估算约 ${(actualWeightGrams/1000).toFixed(1)}kg`;
+  } else {
+    let actualKg = num($('#estActualWeight').value, 0);
+    if (actualKg <= 0) { alert('请填写实重'); return; }
+    actualWeightGrams = actualKg * 1000;
+    let l = num($('#estLength').value, 0), w = num($('#estWidth').value, 0), h = num($('#estHeight').value, 0);
+    if (l>0 && w>0 && h>0) {
+      totalVolGrams = (l * w * h / 5000) * 1000; // 此处先用默认5000，后续会按不同配置重新算
+    }
+    detailStr = `实重 ${actualKg}kg`;
+  }
+
+  // 找到该国家下所有启用的配置
+  let validConfigs = DB.configs.filter(c => c.countryId === countryId && c.enabled == 1);
+  
+  if (validConfigs.length === 0) {
+    $('#emptyResultTip').style.display = 'none';
+    $('#estimateResultsList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">该国家暂无可用线路配置</div>';
+    return;
+  }
+
+  let results = [];
+
+  validConfigs.forEach(cfg => {
+    let line = DB.lines.find(l => l.id === cfg.lineId);
+    if (!line || line.enabled != 1) return; // 线路未启用
+
+    // 1. 判断体积重与计抛规则
+    let calcWeightGrams = actualWeightGrams;
+    let volText = '';
+    
+    // 计算实际材积重
+    let currentVolGrams = 0;
+    if (currentMode === 'weight') {
+      let l = num($('#estLength').value, 0), w = num($('#estWidth').value, 0), h = num($('#estHeight').value, 0);
+      if (l>0 && w>0 && h>0) {
+        currentVolGrams = (l * w * h / cfg.volDivisor) * 1000;
+      }
+    } else if (currentMode === 'shoe') {
+      // 鞋子模式估算体积重（需动态按该配置的基数算，鞋子默认尺寸：35x25x15）
+      currentVolGrams = (35 * 25 * 15 / cfg.volDivisor) * 1000 * (actualWeightGrams / 1200);
+    }
+
+    // 应用规则
+    if (cfg.volRule == 1) { // 取最大值
+      if (currentVolGrams > actualWeightGrams) {
+        calcWeightGrams = currentVolGrams;
+        volText = ` (材积重 ${(currentVolGrams/1000).toFixed(2)}kg)`;
+      }
+    } else { // 实际重量
+      calcWeightGrams = actualWeightGrams;
+    }
+
+    // 2. 判断重量限制
+    if (calcWeightGrams < cfg.minWeight) calcWeightGrams = cfg.minWeight; // 最低消费重量
+    if (calcWeightGrams > cfg.maxWeight) return; // 超过最高限制，不可用
+
+    // 3. 计算基础运费
+    let basePrice = 0;
+    if (calcWeightGrams <= cfg.firstWeight) {
+      basePrice = cfg.firstPrice;
+    } else {
+      let extra = Math.ceil((calcWeightGrams - cfg.firstWeight) / cfg.addWeight);
+      basePrice = cfg.firstPrice + extra * cfg.addPrice;
+    }
+
+    // 4. 附加费计算
+    let fuelCost = basePrice * (cfg.fuelRate / 100);
+    let serviceCost = basePrice * (cfg.serviceFee / 100);
+    let totalPrice = basePrice + fuelCost + serviceCost + cfg.customsFee + cfg.operationFee;
+
+    results.push({
+      line: line, cfg: cfg, price: totalPrice, calcWeight: calcWeightGrams, volText: volText
+    });
+  });
+
+  if (results.length === 0) {
+    $('#emptyResultTip').style.display = 'none';
+    $('#estimateResultsList').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">包裹重量或尺寸超出该国家所有线路的限制</div>';
+    return;
+  }
+
+  // 按价格排序
+  results.sort((a,b) => a.price - b.price);
+
+  $('#emptyResultTip').style.display = 'none';
+  $('#estimateResultsList').innerHTML = results.map(r => `
+    <div class="route-card">
+      <div class="card-top">
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${r.line.icon ? `<img src="${r.line.icon}" style="width:40px;height:40px;border-radius:8px;border:1px solid var(--border);">` : `<div style="width:40px;height:40px;background:var(--primary-light);color:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;">${r.line.name.charAt(0)}</div>`}
+          <div>
+            <div class="carrier-name">${esc(r.line.name)} <span class="tag">${esc(r.line.carrier)}</span></div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:4px;">${esc(r.cfg.deliveryCycle)} · 由 ${esc(r.line.sender)} 发出</div>
+          </div>
+        </div>
+        <div class="price">
+          <span class="amount">¥${r.price.toFixed(2)}</span>
+          <span style="font-size:12px;color:var(--text-3)">预估总价</span>
+        </div>
+      </div>
+      
+      <div class="card-info">
+        <span>⚖️ 计费重: ${(r.calcWeight/1000).toFixed(2)}kg ${r.volText}</span>
+        <span>⏱ ${r.cfg.deliveryCycle}</span>
+        <span>📦 首重${r.cfg.firstWeight}g/¥${r.cfg.firstPrice} + 续重${r.cfg.addWeight}g/¥${r.cfg.addPrice}</span>
+      </div>
+
+      ${r.line.forbiddenServices && r.line.forbiddenServices.length ? `
+        <div style="font-size:12px;color:var(--danger);margin-bottom:12px;">
+          <strong>不支持服务：</strong> ${r.line.forbiddenServices.join(', ')}
+        </div>
+      ` : ''}
+
+      <div class="card-rule">
+        <div style="margin-bottom:4px;"><strong>线路特点：</strong> ${esc(r.cfg.features || r.line.features || '无')}</div>
+        <div><strong>禁寄物品：</strong> ${esc(r.cfg.prohibited || r.line.prohibited || '无')}</div>
+        ${r.cfg.customsFee > 0 || r.cfg.fuelRate > 0 || r.cfg.operationFee > 0 ? `
+          <div style="margin-top:8px; border-top:1px dashed var(--border); padding-top:8px; color:var(--text-2)">
+            费用明细：基础运费 ¥${(r.price - r.cfg.customsFee - r.cfg.operationFee).toFixed(2)} 
+            ${r.cfg.fuelRate>0 ? `| 燃油费(${r.cfg.fuelRate}%) ` : ''} 
+            ${r.cfg.customsFee>0 ? `| 报关费 ¥${r.cfg.customsFee} ` : ''} 
+            ${r.cfg.operationFee>0 ? `| 操作费 ¥${r.cfg.operationFee}` : ''}
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `).join('');
+});
+
+
 /* =========================================================
-   启动
+   9. 启动引导：先从云端加载数据，再初始化界面
    ========================================================= */
-bootstrap();
+let DB = null;
+
+(async function initApp() {
+  try {
+    DB = await loadData();
+
+    // 如果云端是空的（首次运行），把默认数据推上去
+    const isDefault = !DB.__cloudInitialized;
+    if (isDefault) {
+      DB.__cloudInitialized = true;
+      await saveData(DB);
+    }
+  } catch (e) {
+    console.error('初始化失败，使用默认数据', e);
+    DB = buildDefaultData();
+  }
+
+  // 初始化前台
+  initFrontend();
+
+  // 若当前已登录且停留在后台视图，也初始化后台
+  if (document.getElementById('view-admin').classList.contains('active')) {
+    initAdmin();
+  }
+})();
+
 </script>
 </body>
 </html>
