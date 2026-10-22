@@ -150,6 +150,12 @@
   /* 加载状态提示 */
   .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 9999; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; }
   .loading-overlay.hide { display: none; }
+
+  /* 数据文件状态提示 */
+  .data-file-status { font-size: 12px; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; }
+  .data-file-status.ok { background: var(--success); color: #fff; }
+  .data-file-status.warn { background: var(--notice-bg); color: var(--notice-text); border: 1px solid var(--notice-border); }
+  .data-file-status.off { background: var(--bg); color: var(--text-3); }
 </style>
 </head>
 <body>
@@ -164,6 +170,7 @@
     跨境物流查价系统
   </div>
   <div class="top-actions">
+    <span id="dataFileStatus" class="data-file-status off" title="数据文件写入状态">⏳ 检测中</span>
     <button class="theme-btn" id="themeToggle" title="切换暗黑/明亮模式">🌙</button>
     <nav class="tabs">
       <button class="tab active" data-view="query">前台查询</button>
@@ -291,6 +298,17 @@
               <button class="btn danger" id="btnLogout">退出登录</button>
             </div>
           </div>
+        </div>
+        <div style="margin-top: 24px; padding: 16px; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+          <div style="font-weight: 600; margin-bottom: 8px;">💾 数据文件管理</div>
+          <div style="font-size: 13px; color: var(--text-2); margin-bottom: 12px; line-height: 1.6;">
+            所有修改会实时同步到 <code>data.txt</code>。若浏览器不支持文件写入，可点击下方按钮手动导出数据文件。
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn ghost" id="btnExportData">📥 导出 data.txt</button>
+            <button class="btn ghost" id="btnReloadData">🔄 重新加载 data.txt</button>
+          </div>
+          <div id="fileSupportHint" style="margin-top: 10px; font-size: 12px;"></div>
         </div>
       </div>
 
@@ -671,16 +689,16 @@
 </div>
 
 <!-- ============================================================
-   【新增】数据服务模块 —— 从 data.txt 加载数据，并管理内存与持久化
+   数据服务模块 —— 从 data.txt 加载，并支持写回 data.txt
    ============================================================ -->
 <script id="dataServiceScript">
 /**
  * dataService.js
- * 数据内容保存在独立 data.txt 文件中。
  * - 启动时异步 fetch data.txt（JSON格式）加载数据。
- * - 若 fetch 失败（如本地 file:// 协议打开），回退使用内置默认数据，并提示用户。
- * - 后续所有修改通过 saveDB 保存到 localStorage（运行时缓存），
- *   同时可选通过下载方式导出为新的 data.txt。
+ * - saveDB 时：
+ *   1. 更新内存 + localStorage（运行时持久化）
+ *   2. 尝试通过 File System Access API 写回 data.txt（需用户授权，仅限安全上下文/HTTPS或localhost）
+ *   3. 若不支持，则提示用户手动导出
  */
 (function() {
   const DATA_FILE = 'data.txt';               // 独立数据文件
@@ -688,6 +706,7 @@
   const AUTH_KEY = 'logistics_auth_v1';
 
   let memoryDB = null;   // 内存中的数据库对象
+  let fileHandle = null; // File System Access API 文件句柄
 
   /* ---- 内置默认数据（仅当 data.txt 加载失败时兜底） ---- */
   function buildDefaultData() {
@@ -740,18 +759,25 @@
       const resp = await fetch(DATA_FILE, { cache: 'no-store' });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const text = await resp.text();
+      if (!text)
+      {
+        var dataJson=buildDefaultData()
+        writeToDataFile(dataJson)
+        text=JSON.stringify(text)
+        console.log('数据初始化')
+      }
       const data = JSON.parse(text);
       if (!data || !data.lines || !data.countries || !data.configs) {
         throw new Error('数据文件格式不正确');
       }
       return data;
     } catch (err) {
-      console.warn('[DataService] 加载 data.txt 失败，回退使用默认数据:', err.message);
+      console.warn('[DataService] 加载 data.txt 失败:', err.message);
       return null;
     }
   }
 
-  /* ---- localStorage 读写（运行时缓存/持久化） ---- */
+  /* ---- localStorage 读写 ---- */
   function saveToStorage(data) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
   }
@@ -778,31 +804,81 @@
     localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
   }
 
+  /* ---- 文件写入：File System Access API ---- */
+  const isFileSystemAccessSupported = typeof window.showSaveFilePicker === 'function';
+
+  async function writeToDataFile(data) {
+    if (!isFileSystemAccessSupported) {
+      return { ok: false, reason: 'unsupported' };
+    }
+
+    try {
+      // 若已有文件句柄，先尝试复用（需要用户此前授权过）
+      if (fileHandle) {
+        try {
+          const writable = await fileHandle.createWritable();
+          await writable.write(JSON.stringify(data, null, 2));
+          await writable.close();
+          return { ok: true, mode: 'reuse' };
+        } catch (e) {
+          // 句柄失效，重新选择
+          fileHandle = null;
+        }
+      }
+
+      // 弹出文件保存选择器，让用户选择/创建 data.txt
+      const handle = await window.showSaveFilePicker({
+        suggestedName: DATA_FILE,
+        types: [{ description: '数据文件', accept: { 'text/plain': ['.txt'] } }]
+      });
+      fileHandle = handle;
+
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(data, null, 2));
+      await writable.close();
+      return { ok: true, mode: 'new' };
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        return { ok: false, reason: 'cancelled' };
+      }
+      console.error('[DataService] 写入 data.txt 失败:', err);
+      return { ok: false, reason: err.message };
+    }
+  }
+
+  /* ---- 状态回调（供 UI 更新提示） ---- */
+  let onFileStatusChange = null;
+  function setFileStatusCallback(cb) {
+    onFileStatusChange = cb;
+  }
+  function notifyFileStatus(status, extra) {
+    if (typeof onFileStatusChange === 'function') {
+      onFileStatusChange(status, extra);
+    }
+  }
+
   /* ---- 对外暴露接口 ---- */
   window.DataService = {
     /**
      * 异步初始化：优先从 data.txt 加载；失败则尝试 localStorage；再失败用内置默认数据。
-     * 返回加载后的 DB 对象，并缓存到 memoryDB。
      */
     async init() {
-      // 1. 尝试从独立数据文件加载
       let fromFile = await loadFromFile();
       if (fromFile) {
         memoryDB = fromFile;
-        saveToStorage(memoryDB);   // 同步到 localStorage 作为运行时备份
+        saveToStorage(memoryDB);
+        notifyFileStatus('loaded');
         return memoryDB;
       }
-
-      // 2. 尝试从 localStorage 恢复（可能是用户上次编辑后保存的）
       let fromStorage = loadFromStorage();
       if (fromStorage) {
         memoryDB = fromStorage;
+        notifyFileStatus('fallback');
         return memoryDB;
       }
-
-      // 3. 兜底：内置默认数据
       memoryDB = buildDefaultData();
       saveToStorage(memoryDB);
+      notifyFileStatus('default');
       return memoryDB;
     },
 
@@ -811,13 +887,21 @@
       return memoryDB;
     },
 
-    /** 保存 DB：更新内存并写入 localStorage（运行时持久化） */
-    saveDB(db) {
+    /**
+     * 保存 DB：更新内存 + localStorage，并尝试写回 data.txt
+     * 返回一个 Promise，解析为 { storage: true, file: { ok, reason } }
+     */
+    async saveDB(db) {
       memoryDB = db;
       saveToStorage(db);
+
+      // 异步写回 data.txt
+      const fileResult = await writeToDataFile(db);
+      notifyFileStatus(fileResult.ok ? 'saved' : (fileResult.reason || 'failed'), fileResult);
+      return { storage: true, file: fileResult };
     },
 
-    /** 将当前数据导出为 data.txt 格式的 JSON 字符串（供下载） */
+    /** 将当前数据导出为 data.txt 格式的 JSON 字符串 */
     exportToFileString() {
       return JSON.stringify(memoryDB, null, 2);
     },
@@ -832,6 +916,17 @@
       memoryDB = buildDefaultData();
       saveToStorage(memoryDB);
       return memoryDB;
+    },
+
+    /** 设置文件状态回调 */
+    setFileStatusCallback: setFileStatusCallback,
+
+    /** 是否支持 File System Access API */
+    isFileSystemAccessSupported,
+
+    /** 重置文件句柄（重新加载后需要重新选择文件） */
+    resetFileHandle() {
+      fileHandle = null;
     }
   };
 })();
@@ -839,7 +934,7 @@
 
 <script>
 /* =========================================================
-   主逻辑 —— 等待 DataService 初始化完成后启动
+   主逻辑
    ========================================================= */
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -850,40 +945,65 @@ const esc = s => String(s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','
 function closeModal(id) { $('#' + id).classList.remove('show'); }
 function openModal(id) { $('#' + id).classList.add('show'); }
 
-/* ---- 全局变量 ---- */
-let DB = null;      // 数据库对象，由 DataService 初始化后赋值
-let AUTH = null;    // 登录凭据
+let DB = null;
+let AUTH = null;
 
-/* ---- 持久化封装 ---- */
-function persistDB() {
-  window.DataService.saveDB(DB);
+/* ---- 文件状态提示更新 ---- */
+function updateFileStatus(status, extra) {
+  const el = $('#dataFileStatus');
+  if (!el) return;
+  const map = {
+    loaded:   { cls: 'ok',   text: '✅ 数据已加载', title: '从 data.txt 加载成功' },
+    saved:    { cls: 'ok',   text: '💾 已保存到 data.txt', title: '数据已写回文件' },
+    fallback: { cls: 'warn', text: '⚠️ 使用缓存数据', title: 'data.txt 加载失败，使用 localStorage 缓存' },
+    default:  { cls: 'warn', text: '⚠️ 使用默认数据', title: 'data.txt 加载失败，使用内置默认数据' },
+    failed:   { cls: 'warn', text: '⚠️ 文件写入失败', title: extra?.reason || '请手动导出 data.txt' },
+    unsupported: { cls: 'off', text: '📄 仅本地缓存', title: '浏览器不支持文件写入，请手动导出 data.txt' },
+    cancelled: { cls: 'off', text: '⏸️ 写入已取消', title: '您取消了文件保存' },
+  };
+  const info = map[status] || { cls: 'off', text: '⏳ 检测中', title: '' };
+  el.className = 'data-file-status ' + info.cls;
+  el.textContent = info.text;
+  el.title = info.title;
 }
-function persistAuth() {
-  window.DataService.saveAuth(AUTH);
+
+/* ---- 持久化封装：异步保存 ---- */
+async function persistDB() {
+  const result = await window.DataService.saveDB(DB);
+  return result;
 }
 
 /* =========================================================
-   启动流程：等待数据加载完成 → 初始化 UI
+   启动
    ========================================================= */
 async function bootstrap() {
   const loadingEl = $('#loadingOverlay');
 
-  // 通过 DataService 加载数据（优先 data.txt）
+  // 注册文件状态回调
+  window.DataService.setFileStatusCallback(updateFileStatus);
+
   DB = await window.DataService.init();
   AUTH = window.DataService.getAuth();
 
-  // 隐藏加载提示
   loadingEl.classList.add('hide');
 
-  // 绑定主题、导航、所有事件（原脚本内容）
+  // 更新文件支持提示
+  const hint = $('#fileSupportHint');
+  if (hint) {
+    if (window.DataService.isFileSystemAccessSupported) {
+      hint.innerHTML = '<span style="color:var(--success)">✅ 浏览器支持自动写回 data.txt。保存时将弹出文件选择器，请选择 data.txt 即可覆盖更新。</span>';
+    } else {
+      hint.innerHTML = '<span style="color:var(--danger)">⚠️ 当前浏览器不支持自动写回文件。修改后请点击「导出 data.txt」手动保存。</span>';
+    }
+  }
+
   initThemeAndNav();
   initEventListeners();
   initFrontend();
-  console.log('[App] 数据加载完成，来源：data.txt 或 localStorage/默认');
 }
 
 /* =========================================================
-   3. 主题与导航切换
+   主题与导航
    ========================================================= */
 function initThemeAndNav() {
   const themeToggleBtn = $('#themeToggle');
@@ -919,7 +1039,7 @@ function initThemeAndNav() {
 }
 
 /* =========================================================
-   4. 事件绑定（集中初始化）
+   事件绑定
    ========================================================= */
 function initEventListeners() {
   /* ---- 后台菜单切换 ---- */
@@ -930,6 +1050,32 @@ function initEventListeners() {
       $$('.admin-panel').forEach(p => p.classList.remove('active'));
       $('#' + item.dataset.target).classList.add('active');
     });
+  });
+
+  /* ---- 数据文件操作 ---- */
+  $('#btnExportData').addEventListener('click', () => {
+    const content = window.DataService.exportToFileString();
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'data.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  $('#btnReloadData').addEventListener('click', async () => {
+    if (!confirm('重新加载 data.txt 将丢弃未保存的修改，确定继续吗？')) return;
+    window.DataService.resetFileHandle();
+    const loadingEl = $('#loadingOverlay');
+    loadingEl.classList.remove('hide');
+    loadingEl.textContent = '正在重新加载 data.txt ...';
+    DB = await window.DataService.init();
+    loadingEl.classList.add('hide');
+    initAdmin();
+    initFrontend();
   });
 
   /* ================= 国际线路 ================= */
@@ -945,7 +1091,7 @@ function initEventListeners() {
     openModal('lineModal');
   });
 
-  $('#btnSaveLine').addEventListener('click', () => {
+  $('#btnSaveLine').addEventListener('click', async () => {
     let name = $('#lineName').value.trim();
     if (!name) { alert('请填写线路名称'); return; }
     
@@ -964,15 +1110,15 @@ function initEventListeners() {
     } else {
       DB.lines.push(Object.assign({ id: uid('l') }, payload));
     }
-    persistDB();
+    await persistDB();
     closeModal('lineModal'); renderAdminLines();
   });
 
-  window.delLine = function(id) {
+  window.delLine = async function(id) {
     if (confirm('删除线路会同时删除相关的线路配置，确定吗？')) {
       DB.lines = DB.lines.filter(x => x.id !== id);
       DB.configs = DB.configs.filter(x => x.lineId !== id);
-      persistDB();
+      await persistDB();
       renderAdminLines(); renderAdminConfigs();
     }
   };
@@ -999,7 +1145,7 @@ function initEventListeners() {
     openModal('configModal');
   });
 
-  $('#btnSaveConfig').addEventListener('click', () => {
+  $('#btnSaveConfig').addEventListener('click', async () => {
     let payload = {
       lineId: $('#cfgLineId').value, countryId: $('#cfgCountryId').value,
       enabled: Number($('input[name="cfgEnabled"]:checked').value),
@@ -1023,20 +1169,20 @@ function initEventListeners() {
     } else {
       DB.configs.push(Object.assign({ id: uid('cfg') }, payload));
     }
-    persistDB();
+    await persistDB();
     closeModal('configModal'); renderAdminConfigs();
   });
 
-  window.delConfig = function(id) {
+  window.delConfig = async function(id) {
     if (confirm('确定删除该线路配置吗？')) {
       DB.configs = DB.configs.filter(x => x.id !== id);
-      persistDB();
+      await persistDB();
       renderAdminConfigs();
     }
   };
 
   /* ================= 国家 ================= */
-  $('#btnAddCountry').addEventListener('click', () => {
+  $('#btnAddCountry').addEventListener('click', async () => {
     let str = $('#batchCountryInput').value;
     if (!str.trim()) return;
     
@@ -1054,7 +1200,7 @@ function initEventListeners() {
     });
 
     if (addedCount > 0) {
-      persistDB();
+      await persistDB();
       renderAdminCountries(); 
       $('#filterCfgCountry').innerHTML = '<option value="">全部国家</option>' + DB.countries.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
       $('#batchCountryInput').value = '';
@@ -1063,27 +1209,27 @@ function initEventListeners() {
     alert(`成功添加 ${addedCount} 个国家${duplicateCount>0 ? `，${duplicateCount} 个已存在被忽略` : ''}`);
   });
 
-  window.delCountry = function(id) {
+  window.delCountry = async function(id) {
     if (confirm('删除国家会同时删除相关的线路配置，确定吗？')) {
       DB.countries = DB.countries.filter(x => x.id !== id);
       DB.configs = DB.configs.filter(x => x.countryId !== id);
-      persistDB();
+      await persistDB();
       renderAdminCountries(); renderAdminConfigs();
     }
   };
 
   /* ================= 公告 & 联系方式 ================= */
-  $('#btnSaveNotice').addEventListener('click', () => {
+  $('#btnSaveNotice').addEventListener('click', async () => {
     DB.settings.announcement = $('#cfgNotice').value.trim();
-    persistDB();
+    await persistDB();
     alert('公告已保存');
   });
 
-  $('#btnSaveContact').addEventListener('click', () => {
+  $('#btnSaveContact').addEventListener('click', async () => {
     DB.settings.phone = $('#cfgPhone').value.trim();
     DB.settings.wechat = $('#cfgWechat').value.trim();
     DB.settings.address = $('#cfgAddress').value.trim();
-    persistDB();
+    await persistDB();
     alert('联系方式已保存');
   });
 
@@ -1123,7 +1269,7 @@ function initEventListeners() {
     if (!$('#newPass').value) { alert('新密码不能为空'); return; }
     if ($('#newPass').value !== $('#newPass2').value) { alert('两次密码不一致'); return; }
     AUTH.password = $('#newPass').value;
-    persistAuth();
+    window.DataService.saveAuth(AUTH);
     closeModal('passMask'); alert('密码修改成功');
   });
 
@@ -1297,7 +1443,7 @@ function initEventListeners() {
 }
 
 /* =========================================================
-   5. 后台渲染函数
+   后台渲染
    ========================================================= */
 function initAdmin() {
   $('#adminCurrentUser').value = AUTH.username;
@@ -1444,7 +1590,7 @@ window.editConfig = function(id) {
 };
 
 /* =========================================================
-   6. 前台渲染
+   前台渲染
    ========================================================= */
 function initFrontend() {
   if (DB.settings.announcement) {
