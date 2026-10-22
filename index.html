@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>物流线路价格查询系统</title>
+<style>
+  :root{
+    --primary:#1a6bff; --primary-dark:#0d4fd1; --primary-light:#e8f0fe;
+    --bg:#f2f3f5; --card:#fff; --text:#1f2329; --text-2:#646a73; --text-3:#8f959e;
+    --border:#e5e6eb; --danger:#f54a45; --success:#2ea121; --radius:10px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:14px}
+
+  .topbar{position:sticky;top:0;z-index:50;height:54px;background:#fff;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+  .brand{font-size:16px;font-weight:600}
+  .tabs{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:8px}
+  .tab{border:none;background:transparent;padding:6px 14px;border-radius:6px;font-size:13px;color:var(--text-2);font-weight:500}
+  .tab.active{background:#fff;color:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+  .view{display:none;padding-bottom:40px}
+  .view.active{display:block}
+
+  .wrap{max-width:760px;margin:0 auto;padding:14px}
+  .panel{background:#fff;border-radius:var(--radius);padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px}
+  .panel h3{font-size:15px;font-weight:600;margin-bottom:12px}
+
+  .field{margin-bottom:12px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:12px;color:var(--text-3);margin-bottom:6px}
+  .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--border);
+    border-radius:8px;background:#fff;outline:none;color:var(--text)}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary)}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;
+    border-radius:8px;border:none;font-size:14px;font-weight:500;background:var(--primary);color:#fff;transition:.15s}
+  .btn:hover{background:var(--primary-dark)}
+  .btn:active{transform:scale(.98)}
+  .btn.block{width:100%}
+  .btn.ghost{background:#fff;color:var(--text-2);border:1px solid var(--border)}
+  .btn.ghost:hover{background:var(--bg)}
+  .btn.danger{background:var(--danger)}
+  .btn.danger:hover{background:#d93a35}
+  .btn.small{padding:6px 12px;font-size:13px}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* 估价器专属样式 - 恢复蓝色系 */
+  .method-switch { display: flex; gap: 10px; margin-bottom: 16px; }
+  .method-btn { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text-2); font-size: 14px; text-align: center; font-weight: 500; transition: 0.2s; }
+  .method-btn.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+  
+  .shoe-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .shoe-row input:nth-child(1) { flex: 3; }
+  .shoe-row input:nth-child(2) { flex: 1; text-align: center; }
+  .shoe-row input:nth-child(3) { flex: 1; text-align: center; }
+  .shoe-row .remove-shoe { width: 36px; height: 36px; border-radius: 6px; border: none; background: var(--bg); color: var(--text-3); font-size: 18px; flex-shrink: 0; }
+  
+  .add-shoe-btn { width: 100%; padding: 10px; border: 1px dashed var(--border); background: #fff; border-radius: 8px; color: var(--text-2); font-size: 14px; margin-bottom: 12px; }
+  
+  .quick-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .quick-tag { padding: 6px 12px; border: 1px solid var(--border); border-radius: 20px; background: #fff; font-size: 12px; color: var(--text-2); }
+  
+  .dimension-group { display: flex; align-items: center; gap: 8px; }
+  .dimension-group input { text-align: center; }
+  .dimension-group span { color: var(--text-3); font-size: 14px; }
+
+  /* 结果列表 - 恢复蓝色系 */
+  .route-card{background:#fff;border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.04); border: 1px solid var(--border);}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+  .carrier-name{font-size:16px;font-weight:600;line-height:1.35; color:var(--text);}
+  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:4px;
+    background:var(--primary-light);color:var(--primary);margin-left:6px;vertical-align:middle;font-weight:400}
+  .price{text-align:right;flex-shrink:0}
+  .price .amount{font-size:22px;font-weight:700;color:var(--danger);line-height:1.1}
+  .price .unit{display:block;font-size:11px;color:var(--text-3);margin-top:3px}
+  .card-info{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--text-2);margin-bottom:10px}
+  .card-rule{border-top:1px dashed var(--border);padding-top:10px;font-size:12px;color:var(--text-3);line-height:1.7}
+  .card-rule strong{color:var(--text-2);font-weight:500}
+
+  .table-wrap{overflow-x:auto;background:#fff;border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:#fafbfc;color:var(--text-3);font-weight:500;font-size:12px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td .name{font-weight:500}
+  td .sub{font-size:12px;color:var(--text-3);margin-top:2px}
+  .op-btns{display:flex;gap:6px}
+  .link-btn{border:none;background:none;color:var(--primary);font-size:13px;padding:2px 4px}
+  .link-btn.danger{color:var(--danger)}
+
+  .modal-mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;
+    align-items:center;justify-content:center;padding:16px}
+  .modal-mask.show{display:flex}
+  .modal{background:#fff;border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--border)}
+  .modal-head h3{font-size:16px;font-weight:600}
+  .modal-close{border:none;background:none;font-size:22px;color:var(--text-3);line-height:1;padding:0 4px}
+  .modal-body{padding:16px}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 16px;border-top:1px solid var(--border)}
+  .checkbox-group{display:flex;flex-wrap:wrap;gap:8px 14px;padding-top:2px}
+  .checkbox-group label{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text-2);margin:0}
+  .checkbox-group input{width:auto;padding:0}
+
+  .hint{font-size:12px;color:var(--text-3);line-height:1.7;margin-top:8px}
+  .warn-box{background:#fff7e6;border:1px solid #ffe0a3;color:#a86a00;border-radius:8px;
+    padding:10px 12px;font-size:12px;line-height:1.7;margin-bottom:12px}
+  .error-msg{color:var(--danger);font-size:12px;margin-bottom:10px;min-height:16px;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">物流线路价格查询系统</div>
+  <nav class="tabs">
+    <button class="tab active" data-view="query">前台查询</button>
+    <button class="tab" data-view="admin">后台管理</button>
+  </nav>
+</header>
+
+<!-- ================= 前台查询 ================= -->
+<section id="view-query" class="view active">
+  <div class="wrap">
+    
+    <div class="panel">
+      <h3>快速估价</h3>
+      
+      <div class="field">
+        <label>估价方式</label>
+        <div class="method-switch">
+          <button class="method-btn active" data-mode="shoe">👟 按鞋子估（新手）</button>
+          <button class="method-btn" data-mode="weight">📐 按重量/尺寸（老手）</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>选择目的地（国家）</label>
+        <select id="estDestSelect"></select>
+      </div>
+
+      <!-- 模式一：按鞋子估 -->
+      <div id="modeShoe">
+        <div class="field">
+          <label>填型号 + 尺码 + 双数（多款混装可一起算）</label>
+          <div id="shoeList">
+            <div class="shoe-row">
+              <input type="text" placeholder="型号，例如 Kobe" class="shoe-model">
+              <input type="number" placeholder="尺码" class="shoe-size">
+              <input type="number" placeholder="双数" value="1" class="shoe-qty">
+              <button class="remove-shoe" onclick="this.parentNode.remove()">×</button>
+            </div>
+          </div>
+          <button class="add-shoe-btn" id="addShoeBtn">+ 再加一款</button>
+        </div>
+        <div class="field">
+          <label>常见款点一下（填进最近选中的那行）：</label>
+          <div class="quick-tags">
+            <button class="quick-tag" onclick="fillShoe('AJ1 低帮')">AJ1 低帮</button>
+            <button class="quick-tag" onclick="fillShoe('AJ4')">AJ4</button>
+            <button class="quick-tag" onclick="fillShoe('Dunk 熊猫')">Dunk 熊猫</button>
+            <button class="quick-tag" onclick="fillShoe('AJ1 高帮')">AJ1 高帮</button>
+            <button class="quick-tag" onclick="fillShoe('AJ5')">AJ5</button>
+            <button class="quick-tag" onclick="fillShoe('AJ11')">AJ11</button>
+            <button class="quick-tag" onclick="fillShoe('Yeezy')">Yeezy</button>
+            <button class="quick-tag" onclick="fillShoe('AF1')">AF1</button>
+            <button class="quick-tag" onclick="fillShoe('Kobe')">Kobe</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 模式二：按重量/尺寸 -->
+      <div id="modeWeight" style="display: none;">
+        <div class="field">
+          <label>实重（KG）</label>
+          <input type="number" id="estActualWeight" placeholder="包裹实际称重，例如 5" step="0.1">
+        </div>
+        <div class="field">
+          <label>包裹尺寸（cm · 选填，用于算材积重 ÷5000）</label>
+          <div class="dimension-group">
+            <input type="number" id="estLength" placeholder="长">
+            <span>×</span>
+            <input type="number" id="estWidth" placeholder="宽">
+            <span>×</span>
+            <input type="number" id="estHeight" placeholder="高">
+          </div>
+        </div>
+      </div>
+
+      <button class="btn block" id="btnEstimate">估算运费 →</button>
+      
+      <!-- 估价结果列表展示区 -->
+      <div id="estimateResultsContainer" style="margin-top: 24px; display: none;">
+        <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--primary);">
+          该国家的所有可用线路及预估价：
+        </div>
+        <div id="estimateResultsList"></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= 后台管理 ================= -->
+<section id="view-admin" class="view">
+  <div class="wrap">
+    <div class="panel" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px;">
+      <div style="font-size:14px;">当前登录：<strong id="adminCurrentUser">admin</strong></div>
+      <button class="btn ghost small" id="btnLogout" style="color:var(--danger); border-color:var(--danger);">退出登录</button>
+    </div>
+
+    <div class="panel">
+      <h3>线路管理</h3>
+      <div class="btn-row" style="margin-bottom:8px">
+        <button class="btn" id="btnAdd">+ 新增线路</button>
+        <button class="btn ghost" id="btnExport">导出数据 (.xls)</button>
+        <button class="btn ghost" id="btnImport">导入数据 (.csv)</button>
+        <button class="btn ghost" id="btnReset">恢复默认数据</button>
+        <input type="file" id="fileInput" accept=".csv" style="display:none">
+      </div>
+      <div class="hint" style="color:var(--danger); margin-bottom:12px;">
+        注意：导出的 .xls 可直接用 Excel 打开。如需导入，请在 Excel 中点击「文件 → 另存为 → 选择 CSV (逗号分隔)」后再上传。
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>线路名称</th>
+              <th>目的地</th>
+              <th>首重 / 续重</th>
+              <th>时效</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="adminTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>基础设置</h3>
+      <div class="field">
+        <label>目的地列表（用逗号分隔，例如：美国,英国,日本）</label>
+        <input id="cfgDests">
+      </div>
+      <button class="btn" id="btnSaveBase">保存基础设置</button>
+    </div>
+
+    <div class="panel">
+      <h3>修改登录密码</h3>
+      <div class="grid-3">
+        <div class="field">
+          <label>原密码</label>
+          <input type="password" id="oldPass" placeholder="输入旧密码">
+        </div>
+        <div class="field">
+          <label>新密码</label>
+          <input type="password" id="newPass" placeholder="输入新密码">
+        </div>
+        <div class="field">
+          <label>确认新密码</label>
+          <input type="password" id="newPass2" placeholder="再次输入新密码">
+        </div>
+      </div>
+      <button class="btn" id="btnChangePass">保存新密码</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 登录弹窗 ================= -->
+<div class="modal-mask" id="loginMask">
+  <div class="modal" style="max-width: 360px;">
+    <div class="modal-head">
+      <h3>后台管理登录</h3>
+      <button class="modal-close" id="loginClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>账号</label>
+        <input id="loginUser" placeholder="请输入账号" type="text">
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input id="loginPass" placeholder="请输入密码" type="password">
+      </div>
+      <div class="error-msg" id="loginError"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="loginCancel">取消</button>
+      <button class="btn" id="loginSubmit">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 编辑线路弹窗 ================= -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">新增线路</h3>
+      <button class="modal-close" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="field">
+          <label>线路名称 *</label>
+          <input id="fName" placeholder="例如：THGJ 美国快线小包">
+        </div>
+        <div class="field">
+          <label>标签</label>
+          <input id="fTag" placeholder="例如：VIP、特惠、快线">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>线路类型</label>
+          <input id="fType" placeholder="例如：空运专线、海运专线">
+        </div>
+        <div class="field">
+          <label>目的地 *</label>
+          <select id="fDest"></select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>首重（克）*</label>
+          <input id="fFirstWeight" type="number" min="1" value="500">
+        </div>
+        <div class="field">
+          <label>首重价格（元）*</label>
+          <input id="fFirstPrice" type="number" min="0" step="0.01" value="88">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>续重（克）*</label>
+          <input id="fAddWeight" type="number" min="1" value="500">
+        </div>
+        <div class="field">
+          <label>续重价格（元）*</label>
+          <input id="fAddPrice" type="number" min="0" step="0.01" value="35">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label>燃油费率（%）</label>
+          <input id="fFuel" type="number" min="0" step="0.1" value="0">
+        </div>
+        <div class="field">
+          <label>时效最短（天）</label>
+          <input id="fEtaMin" type="number" min="1" value="7">
+        </div>
+        <div class="field">
+          <label>时效最长（天）</label>
+          <input id="fEtaMax" type="number" min="1" value="12">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="modalCancel">取消</button>
+      <button class="btn" id="modalSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   数据与账号配置
+   ========================================================= */
+const STORAGE_KEY = 'logistics_data_v1';
+const AUTH_KEY = 'logistics_auth_v1';
+
+function getAuth() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  const defaultAuth = { username: 'admin', password: '123456' };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(defaultAuth));
+  return defaultAuth;
+}
+let AUTH = getAuth();
+
+const RAW_DEFAULT = [
+  ['THGJ 美国快线小包','VIP','空运专线','美国',500,88,500,35,12,7,12],
+  ['THGJ 加拿大专线','VIP','空运专线','加拿大',500,95,500,42,12,8,14],
+  ['THGJ 英国专线','VIP','空运专线','英国',500,78,500,30,10,8,13],
+  ['THGJ 德国专线','VIP','空运专线','德国',500,80,500,32,10,8,14],
+  ['优包裹 美国特惠','特惠','空运专线','美国',1000,128,1000,58,8,10,18],
+  ['优包裹 英国特惠','特惠','空运专线','英国',1000,108,1000,48,7,10,17],
+  ['联云 美国经济小包','慢线','经济小包','美国',100,25,100,8,5,15,25],
+  ['联云 日本经济小包','慢线','经济小包','日本',100,18,100,5.5,3,10,16],
+  ['速腾 美国全球快递','快线','商业快递','美国',500,168,500,72,15,4,8],
+  ['速腾 英国全球快递','快线','商业快递','英国',500,148,500,65,14,4,7],
+  ['海达 美国海运大货','海运','海运专线','美国',5000,280,1000,35,0,25,40]
+];
+
+function buildDefaultData(){
+  return {
+    origins:['深圳','广州','义乌','杭州','上海','北京'],
+    dests:['美国','加拿大','英国','德国','法国','澳大利亚','日本','新加坡'],
+    routes: RAW_DEFAULT.map((r,i)=>({
+      id:'r'+(i+1),
+      name:r[0], tag:r[1], type:r[2], dest:r[3],
+      origins:[],
+      firstWeight:r[4], firstPrice:r[5],
+      addWeight:r[6], addPrice:r[7],
+      fuelRate:r[8], etaMin:r[9], etaMax:r[10]
+    }))
+  };
+}
+
+let DB = loadData();
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(d && Array.isArray(d.routes) && Array.isArray(d.origins) && Array.isArray(d.dests)){
+        return d;
+      }
+    }
+  }catch(e){}
+  const d = buildDefaultData();
+  saveData(d);
+  return d;
+}
+function saveData(d){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+  catch(e){ alert('保存失败：浏览器可能禁用了本地存储。请勿使用无痕模式打开。'); }
+}
+
+/* =========================================================
+   通用工具
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const uid = () => 'r' + Date.now() + Math.floor(Math.random()*1000);
+
+function fmtWeight(g){
+  if(g >= 1000 && g % 1000 === 0) return (g/1000) + 'kg';
+  if(g >= 1000) return (g/1000).toFixed(2).replace(/0+$/,'').replace(/\.$/,'') + 'kg';
+  return g + 'g';
+}
+function num(v, def){
+  const n = Number(v);
+  return isFinite(n) ? n : def;
+}
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, m=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[m]);
+}
+
+/* =========================================================
+   计价函数
+   ========================================================= */
+function calcPrice(route, weightGrams){
+  const fw = num(route.firstWeight, 500);
+  const fp = num(route.firstPrice, 0);
+  const aw = num(route.addWeight, 500);
+  const ap = num(route.addPrice, 0);
+  const fuel = num(route.fuelRate, 0);
+  let base;
+  if(weightGrams <= fw){
+    base = fp;
+  }else{
+    const extra = Math.ceil((weightGrams - fw) / aw);
+    base = fp + extra * ap;
+  }
+  return base * (1 + fuel/100);
+}
+
+/* =========================================================
+   视图切换与登录逻辑
+   ========================================================= */
+function switchView(viewName) {
+  $$('.tab').forEach(b => b.classList.toggle('active', b.dataset.view === viewName));
+  $$('.view').forEach(v => v.classList.remove('active'));
+  $('#view-' + viewName).classList.add('active');
+  
+  if(viewName === 'query'){ renderEstimateSelect(); }
+  if(viewName === 'admin'){ 
+    $('#adminCurrentUser').textContent = AUTH.username;
+    renderAdmin(); 
+  }
+}
+
+$$('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetView = btn.dataset.view;
+    if (targetView === 'admin' && sessionStorage.getItem('logistics_logged_in') !== 'true') {
+      $('#loginUser').value = '';
+      $('#loginPass').value = '';
+      $('#loginError').textContent = '';
+      $('#loginMask').classList.add('show');
+      return;
+    }
+    switchView(targetView);
+  });
+});
+
+$('#loginSubmit').addEventListener('click', () => {
+  const u = $('#loginUser').value.trim();
+  const p = $('#loginPass').value;
+  if (u === AUTH.username && p === AUTH.password) {
+    sessionStorage.setItem('logistics_logged_in', 'true');
+    $('#loginMask').classList.remove('show');
+    switchView('admin');
+  } else {
+    $('#loginError').textContent = '账号或密码错误，请重试';
+  }
+});
+$('#loginPass').addEventListener('keydown', e => { if(e.key === 'Enter') $('#loginSubmit').click(); });
+$('#loginClose').addEventListener('click', () => $('#loginMask').classList.remove('show'));
+$('#loginCancel').addEventListener('click', () => $('#loginMask').classList.remove('show'));
+
+$('#btnLogout').addEventListener('click', () => {
+  if(confirm('确定退出当前账号吗？')) {
+    sessionStorage.removeItem('logistics_logged_in');
+    switchView('query');
+  }
+});
+
+$('#btnChangePass').addEventListener('click', () => {
+  const oldP = $('#oldPass').value;
+  const newP = $('#newPass').value;
+  const newP2 = $('#newPass2').value;
+  if (oldP !== AUTH.password) { alert('原密码错误'); return; }
+  if (!newP) { alert('新密码不能为空'); return; }
+  if (newP !== newP2) { alert('两次输入的新密码不一致'); return; }
+  AUTH.password = newP;
+  localStorage.setItem(AUTH_KEY, JSON.stringify(AUTH));
+  $('#oldPass').value = ''; $('#newPass').value = ''; $('#newPass2').value = '';
+  alert('密码修改成功！');
+});
+
+/* =========================================================
+   前台 - 估价器逻辑
+   ========================================================= */
+let currentMode = 'shoe'; // 'shoe' or 'weight'
+
+$('#addShoeBtn').addEventListener('click', () => {
+  const div = document.createElement('div');
+  div.className = 'shoe-row';
+  div.innerHTML = `
+    <input type="text" placeholder="型号，例如 Kobe" class="shoe-model">
+    <input type="number" placeholder="尺码" class="shoe-size">
+    <input type="number" placeholder="双数" value="1" class="shoe-qty">
+    <button class="remove-shoe" onclick="this.parentNode.remove()">×</button>
+  `;
+  $('#shoeList').appendChild(div);
+});
+
+function fillShoe(modelName) {
+  const rows = $$('#shoeList .shoe-row');
+  let targetRow = null;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const inp = rows[i].querySelector('.shoe-model');
+    if (!inp.value) {
+      targetRow = rows[i];
+      break;
+    }
+  }
+  if (!targetRow) {
+    $('#addShoeBtn').click();
+    targetRow = $$('#shoeList .shoe-row').pop();
+  }
+  targetRow.querySelector('.shoe-model').value = modelName;
+  targetRow.querySelector('.shoe-size').focus();
+}
+
+$$('.method-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.method-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    
+    if (currentMode === 'shoe') {
+      $('#modeShoe').style.display = 'block';
+      $('#modeWeight').style.display = 'none';
+    } else {
+      $('#modeShoe').style.display = 'none';
+      $('#modeWeight').style.display = 'block';
+    }
+    $('#estimateResultsContainer').style.display = 'none';
+  });
+});
+
+$('#btnEstimate').addEventListener('click', () => {
+  const dest = $('#estDestSelect').value;
+  if (!dest) { alert('请先选择目的地国家'); return; }
+
+  let totalWeightGrams = 0;
+  let detailStr = '';
+
+  if (currentMode === 'shoe') {
+    const rows = $$('#shoeList .shoe-row');
+    let totalPairs = 0;
+    rows.forEach(row => {
+      const qty = num(row.querySelector('.shoe-qty').value, 0);
+      totalPairs += qty;
+    });
+    if (totalPairs <= 0) { alert('请至少填写一双鞋子的数量'); return; }
+    
+    totalWeightGrams = totalPairs * 1200;
+    detailStr = `共 ${totalPairs} 双鞋，按每双约 1.2kg 估算（含鞋盒），总计约 ${(totalWeightGrams/1000).toFixed(1)}kg`;
+  } else {
+    const actualKg = num($('#estActualWeight').value, 0);
+    const l = num($('#estLength').value, 0);
+    const w = num($('#estWidth').value, 0);
+    const h = num($('#estHeight').value, 0);
+    
+    if (actualKg <= 0) { alert('请填写实重'); return; }
+    
+    let actualGrams = actualKg * 1000;
+    let volGrams = 0;
+    
+    if (l > 0 && w > 0 && h > 0) {
+      const volKg = (l * w * h) / 5000;
+      volGrams = volKg * 1000;
+    }
+    
+    totalWeightGrams = Math.max(actualGrams, volGrams);
+    if (totalWeightGrams === 0) totalWeightGrams = actualGrams;
+    
+    if (volGrams > actualGrams) {
+      detailStr = `实重 ${actualKg}kg，材积重 ${(volGrams/1000).toFixed(2)}kg，按材积重计费`;
+    } else {
+      detailStr = `实重 ${actualKg}kg${volGrams > 0 ? `，材积重 ${(volGrams/1000).toFixed(2)}kg` : ''}，按实重计费`;
+    }
+  }
+
+  const matchedRoutes = DB.routes.filter(r => r.dest === dest);
+  
+  if (!matchedRoutes.length) {
+    $('#estimateResultsContainer').style.display = 'block';
+    $('#estimateResultsList').innerHTML = '<div style="color:var(--text-3); font-size:13px; padding:10px 0;">该国家暂无可用线路</div>';
+    return;
+  }
+
+  $('#estimateResultsContainer').style.display = 'block';
+  
+  const resultData = matchedRoutes.map(route => {
+    return {
+      route,
+      price: calcPrice(route, totalWeightGrams)
+    };
+  }).sort((a, b) => a.price - b.price);
+
+  $('#estimateResultsList').innerHTML = resultData.map(item => `
+    <div class="route-card">
+      <div class="card-top">
+        <div>
+          <span class="carrier-name">${esc(item.route.name)}</span>
+          ${item.route.tag ? `<span class="tag">${esc(item.route.tag)}</span>` : ''}
+        </div>
+        <div class="price">
+          <span class="amount">¥${item.price.toFixed(1)}</span>
+          <span class="unit">预估总价</span>
+        </div>
+      </div>
+      <div class="card-info">
+        <span>${esc(item.route.type || '专线')}</span>
+        <span>${item.route.etaMin}-${item.route.etaMax} 天</span>
+      </div>
+      <div class="card-rule">
+        <strong>计费：</strong>首重 ${fmtWeight(item.route.firstWeight)} / ¥${item.route.firstPrice} · 续重 ${fmtWeight(item.route.addWeight)} / ¥${item.route.addPrice} ${item.route.fuelRate > 0 ? `· 燃油 ${item.route.fuelRate}%` : ''}
+        <br><span>${detailStr}</span>
+      </div>
+    </div>
+  `).join('');
+});
+
+function renderEstimateSelect() {
+  const sel = $('#estDestSelect');
+  const prev = sel.value;
+  sel.innerHTML = DB.dests.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+  if (DB.dests.includes(prev)) sel.value = prev;
+}
+
+/* =========================================================
+   后台管理逻辑
+   ========================================================= */
+function renderAdmin(){
+  const tbody = $('#adminTbody');
+  tbody.innerHTML = DB.routes.map(r=>`
+    <tr>
+      <td>
+        <div class="name">${esc(r.name)}</div>
+        <div class="sub">${esc(r.type||'')} ${r.tag?'· '+esc(r.tag):''}</div>
+      </td>
+      <td>${esc(r.dest)}</td>
+      <td>${fmtWeight(r.firstWeight)}/¥${r.firstPrice}<br>${fmtWeight(r.addWeight)}/¥${r.addPrice}</td>
+      <td>${r.etaMin}-${r.etaMax} 天</td>
+      <td>
+        <div class="op-btns">
+          <button class="link-btn" data-edit="${r.id}">编辑</button>
+          <button class="link-btn danger" data-del="${r.id}">删除</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  $('#cfgDests').value = DB.dests.join(',');
+
+  tbody.querySelectorAll('[data-edit]').forEach(b=>{
+    b.addEventListener('click', ()=> openModal(b.dataset.edit));
+  });
+  tbody.querySelectorAll('[data-del]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      if(confirm('确定删除该线路吗？')){
+        DB.routes = DB.routes.filter(x=>x.id !== b.dataset.del);
+        saveData(DB); renderAdmin(); renderEstimateSelect();
+      }
+    });
+  });
+}
+
+let editingId = null;
+
+function openModal(id){
+  editingId = id || null;
+  $('#modalTitle').textContent = id ? '编辑线路' : '新增线路';
+  $('#fDest').innerHTML = DB.dests.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
+
+  if(id){
+    const r = DB.routes.find(x=>x.id === id);
+    if(!r) return;
+    $('#fName').value = r.name || '';
+    $('#fTag').value = r.tag || '';
+    $('#fType').value = r.type || '';
+    $('#fDest').value = r.dest || (DB.dests[0]||'');
+    $('#fFirstWeight').value = r.firstWeight;
+    $('#fFirstPrice').value = r.firstPrice;
+    $('#fAddWeight').value = r.addWeight;
+    $('#fAddPrice').value = r.addPrice;
+    $('#fFuel').value = r.fuelRate;
+    $('#fEtaMin').value = r.etaMin;
+    $('#fEtaMax').value = r.etaMax;
+  }else{
+    $('#fName').value = ''; $('#fTag').value = ''; $('#fType').value = '';
+    $('#fDest').value = DB.dests[0] || '';
+    $('#fFirstWeight').value = 500; $('#fFirstPrice').value = 88;
+    $('#fAddWeight').value = 500; $('#fAddPrice').value = 35;
+    $('#fFuel').value = 0; $('#fEtaMin').value = 7; $('#fEtaMax').value = 12;
+  }
+  $('#modalMask').classList.add('show');
+}
+
+function closeModal(){ $('#modalMask').classList.remove('show'); editingId = null; }
+$('#modalClose').addEventListener('click', closeModal);
+$('#modalCancel').addEventListener('click', closeModal);
+
+$('#modalSave').addEventListener('click', ()=>{
+  const name = $('#fName').value.trim();
+  const dest = $('#fDest').value;
+  if(!name){ alert('请填写线路名称'); return; }
+
+  const fw = num($('#fFirstWeight').value, 0);
+  const fp = num($('#fFirstPrice').value, -1);
+  const aw = num($('#fAddWeight').value, 0);
+  const ap = num($('#fAddPrice').value, -1);
+  if(fw <= 0 || aw <= 0){ alert('重量必须大于 0'); return; }
+  if(fp < 0 || ap < 0){ alert('价格不能为负数'); return; }
+
+  const payload = {
+    name, tag: $('#fTag').value.trim(), type: $('#fType').value.trim(), dest, origins: [],
+    firstWeight: fw, firstPrice: fp, addWeight: aw, addPrice: ap,
+    fuelRate: num($('#fFuel').value, 0),
+    etaMin: Math.max(1, num($('#fEtaMin').value, 1)),
+    etaMax: Math.max(1, num($('#fEtaMax').value, 1))
+  };
+
+  if(editingId){
+    const idx = DB.routes.findIndex(r=>r.id === editingId);
+    if(idx >= 0) DB.routes[idx] = Object.assign({}, DB.routes[idx], payload);
+  }else{
+    DB.routes.push(Object.assign({ id: uid() }, payload));
+  }
+  saveData(DB); closeModal(); renderAdmin(); renderEstimateSelect();
+});
+
+$('#btnAdd').addEventListener('click', ()=> openModal(null));
+
+$('#btnSaveBase').addEventListener('click', ()=>{
+  const dests = $('#cfgDests').value.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!dests.length){ alert('不能为空'); return; }
+  DB.dests = Array.from(new Set(dests));
+  saveData(DB); renderAdmin(); renderEstimateSelect(); alert('已保存');
+});
+
+$('#btnExport').addEventListener('click', ()=>{
+  let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body><table border="1"><tr>';
+  const headers = ['线路名称','标签','类型','目的地','首重(g)','首重价格(元)','续重(g)','续重价格(元)','燃油费率(%)','时效最短(天)','时效最长(天)'];
+  headers.forEach(h => html += `<th>${h}</th>`);
+  html += '</tr>';
+  DB.routes.forEach(r => {
+    html += `<tr><td>${r.name || ''}</td><td>${r.tag || ''}</td><td>${r.type || ''}</td><td>${r.dest || ''}</td><td>${r.firstWeight}</td><td>${r.firstPrice}</td><td>${r.addWeight}</td><td>${r.addPrice}</td><td>${r.fuelRate}</td><td>${r.etaMin}</td><td>${r.etaMax}</td></tr>`;
+  });
+  html += '</table></body></html>';
+  const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = '物流线路数据_' + new Date().toISOString().slice(0,10) + '.xls';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+});
+
+$('#btnImport').addEventListener('click', ()=> $('#fileInput').click());
+$('#fileInput').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      let text = new TextDecoder('utf-8').decode(ev.target.result);
+      if (text.includes('\uFFFD')) text = new TextDecoder('gbk').decode(ev.target.result);
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      const newRoutes = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        if (cols.length < 11) continue;
+        newRoutes.push({
+          id: uid(), name: (cols[0]||'').trim(), tag: (cols[1]||'').trim(), type: (cols[2]||'').trim(), dest: (cols[3]||'').trim(),
+          firstWeight: Number(cols[4])||500, firstPrice: Number(cols[5])||0,
+          addWeight: Number(cols[6])||500, addPrice: Number(cols[7])||0,
+          fuelRate: Number(cols[8])||0, etaMin: Number(cols[9])||7, etaMax: Number(cols[10])||12,
+          origins: []
+        });
+      }
+      if(!newRoutes.length) throw new Error('未解析到数据');
+      if(!confirm(`解析成功，共 ${newRoutes.length} 条，覆盖原有数据？`)) return;
+      DB.routes = newRoutes; saveData(DB); renderAdmin(); renderEstimateSelect(); alert('导入成功！');
+    } catch(err) { alert('导入失败：' + err.message); }
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(f);
+});
+
+$('#btnReset').addEventListener('click', ()=>{
+  if(!confirm('恢复默认数据会清空所有修改，确定吗？')) return;
+  DB = buildDefaultData(); saveData(DB); renderAdmin(); renderEstimateSelect(); alert('已恢复默认');
+});
+
+/* =========================================================
+   启动
+   ========================================================= */
+renderEstimateSelect();
+</script>
+</body>
+</html>
